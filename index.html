@@ -49,9 +49,16 @@ body {
 /* On a phone the game docks to the top and this pad fills the space under it, so the thumb that steers
    never has to sit on top of the ship. A drag anywhere on the screen works, the pad included. */
 #pad { display: none; }
+#padHint { margin: 0; white-space: pre-line; }
+#tilt {
+  font-family: var(--font-hud); font-size: 17px; padding: 5px 14px; border-radius: 8px;
+  border: 1px solid var(--dim); background: transparent; color: var(--ink); cursor: pointer; touch-action: manipulation;
+}
+#tilt[aria-pressed="true"] { border-color: var(--lime); color: var(--lime); }
 body.thumb { justify-content: flex-start; }
 body.thumb #pad {
-  display: flex; flex: 1 1 0; min-height: 0; align-self: stretch; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; gap: 8px;
+  flex: 1 1 0; min-height: 0; align-self: stretch; align-items: center; justify-content: center;
   box-sizing: border-box; padding: 6px 12px; border: 1px dashed var(--deep); border-radius: 14px;
   color: var(--dim); font-size: 17px; line-height: 1.15; text-align: center; touch-action: none;
 }
@@ -264,10 +271,13 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v10</span>
+  <span id="ver">v11</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
-<div id="pad" aria-hidden="true">Thumb goes down here.<br>Drag anywhere to fly and shoot.</div>
+<div id="pad">
+  <p id="padHint"></p>
+  <button id="tilt" type="button" aria-pressed="false" hidden>Steer by tilting</button>
+</div>
 
 <script>
 (() => {
@@ -1359,14 +1369,14 @@ function updatePlayer(dt) {
   // Booze and crabs shove the ship around: an offset on the drag target, or a nudge when nobody is steering.
   const wob = wobble(), dw = wob - P.wob;
   P.wob = wob;
-  let target = input.dragging ? input.target + wob : P.x + dw;
+  let target = input.dragging ? input.target + wob : gyro.on ? gyroTarget() + wob : P.x + dw;
   if (input.left) target = -1e4;
   if (input.right) target = 1e4;
   P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), 16, W - 16);
   if (!input.dragging) input.target = P.x;
 
   S.fireCd -= dt;
-  if ((input.keyFire || input.touchFire) && S.fireCd <= 0 && S.flare <= 0 && S.jam <= 0) {
+  if ((input.keyFire || input.touchFire || gyro.on) && S.fireCd <= 0 && S.flare <= 0 && S.jam <= 0) {
     // On an 8-ball the ship fires three at a time. Every one of them still costs ten cents.
     const lanes = S.tweak > 0 ? [-55, 0, 55] : [0], spread = 22 * Math.min(S.drinks, 4);
     for (const vx of lanes) S.bullets.push({ x: P.x, y: P.y - 18, vy: -540, vx: vx + rand(-1, 1) * spread });
@@ -1932,6 +1942,7 @@ function start() {
   else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.touchFire = false; input.dragging = false;
+  if (gyro.wanted && !gyro.on && TILT_OK) setGyro(true);
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
 
@@ -2071,6 +2082,43 @@ addEventListener("blur", () => { input.left = input.right = input.keyFire = fals
 
 $("play").addEventListener("click", start);
 $("again").addEventListener("click", start);
+// ---------- tilt steering: an opt-in setting on the thumb pad, for playing without touching the screen ----------
+// Tip the phone left or right and the ship goes there; level is the middle, 18 degrees is the wall. It fires by itself.
+// A finger on the screen still wins while it is down.
+const gyro = { on: false, g: 0, seen: false, wanted: store.get("sd-tilt", false) };
+const tiltBtn = $("tilt"), padHint = $("padHint");
+const TILT_OK = typeof DeviceOrientationEvent !== "undefined";
+const gyroTarget = () => W / 2 + clamp(gyro.g / 18, -1, 1) * (W / 2 - 16);
+function syncGyro(note) {
+  tiltBtn.hidden = !TILT_OK;
+  tiltBtn.textContent = gyro.on ? "Back to dragging" : "Steer by tilting";
+  tiltBtn.setAttribute("aria-pressed", String(gyro.on));
+  padHint.textContent = note || (gyro.on
+    ? "Tilt steering is on. Tip the phone left and right.\nIt fires by itself."
+    : "Thumb goes down here.\nDrag anywhere to fly and shoot.");
+}
+addEventListener("deviceorientation", (e) => {
+  if (typeof e.gamma !== "number") return;
+  gyro.seen = true;
+  gyro.g += (e.gamma - gyro.g) * 0.3;
+});
+// iPhones only hand over tilt after a tap and a yes from the player, so this always runs from a button press.
+async function setGyro(on) {
+  if (on && typeof DeviceOrientationEvent.requestPermission === "function") {
+    let answer = "denied";
+    try { answer = await DeviceOrientationEvent.requestPermission(); } catch {}
+    if (answer !== "granted") { gyro.wanted = false; store.set("sd-tilt", false); syncGyro("Tilt was blocked.\nAllow motion access, then try again."); return; }
+  }
+  gyro.on = on; gyro.wanted = on; gyro.seen = false; store.set("sd-tilt", on);
+  syncGyro();
+  // No tilt reading within two seconds means there is no sensor to steer with.
+  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); } }, 2000);
+}
+tiltBtn.addEventListener("click", () => { setGyro(!gyro.on); tiltBtn.blur(); });
+syncGyro();
+// A saved choice comes back on its own where no permission is needed. On an iPhone it comes back at the next Play tap.
+if (gyro.wanted && TILT_OK && typeof DeviceOrientationEvent.requestPermission !== "function") setGyro(true);
+
 const muteBtn = $("mute");
 function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
 muteBtn.addEventListener("click", () => { muted = !muted; store.set("sd-muted", muted); syncMute(); ensureAudio(); muteBtn.blur(); });
