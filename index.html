@@ -192,12 +192,17 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   position: absolute; left: calc(var(--u) * 10); bottom: calc(var(--u) * 10); z-index: 2;
   font-size: calc(var(--u) * 14); color: var(--dim);
 }
-#mute {
-  position: absolute; right: calc(var(--u) * 8); bottom: calc(var(--u) * 8); z-index: 2;
+/* Two corner buttons: Sound, and Fire (hold your fire to let the guns cool), which takes the version label's corner while a game is on. */
+#mute, #fire {
+  position: absolute; bottom: calc(var(--u) * 8); z-index: 2;
   font-family: var(--font-hud); font-size: calc(var(--u) * 15);
   padding: calc(var(--u) * 3) calc(var(--u) * 8); border-radius: calc(var(--u) * 4);
   border: 1px solid var(--dim); background: var(--scrim); color: var(--dim); cursor: pointer;
+  touch-action: manipulation;
 }
+#mute { right: calc(var(--u) * 8); }
+#fire { left: calc(var(--u) * 8); color: var(--ink); }
+#fire[aria-pressed="false"] { color: var(--red); border-color: var(--red); }
 @media (prefers-reduced-motion: reduce) { .neon .flick { animation: none; } }
 </style>
 </head>
@@ -225,7 +230,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
       <div class="item"><canvas data-icon="eighth" aria-hidden="true"></canvas><div><b>Dime bags</b><span>And eighths: slo-mo</span></div></div>
       <div class="item"><canvas data-icon="eightball" aria-hidden="true"></canvas><div><b>8-ball</b><span>Bosses: triple shot</span></div></div>
     </div>
-    <p class="rule">Hold and drag to fly and shoot. Every shot costs ten cents. Dodge the red stuff.</p>
+    <p class="rule">Drag to fly and shoot, up and down too. Guns overheat, so rest them. Dodge the red stuff.</p>
     <div class="row">
       <button id="play" class="big" type="button">Play</button>
       <button id="titleBoard" class="ghost" type="button">Leaderboard</button>
@@ -271,7 +276,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v11</span>
+  <span id="ver">v12</span>
+  <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 <div id="pad">
@@ -866,7 +872,7 @@ const LAYOUT = [
 ];
 const VALUE = { drone: 100, hornet: 200, choker: 500 };
 const WAVE_LINES = [
-  "More bugs. Same bill.",
+  "More bugs. Same guns.",
   "Cody would've cleared that faster.",
   "Landon says he could do this blindfolded.",
   "Still cheaper than a text plan.",
@@ -876,7 +882,15 @@ const WAVE_LINES = [
 const SHOT_LINES = ["Should've gotten an iPhone.", "That's going in the group chat.", "Walk it off."];
 const SHOT_HALF = { kiss: 11, slap: 11, pan: 10, donut: 9, papers: 9, ticket: 8 };
 
-const input = { left: false, right: false, keyFire: false, touchFire: false, dragging: false, lastFx: 0, target: W / 2 };
+// The ship has the bottom quarter of the screen to move around in.
+const Y_MAX = H - 74, Y_MIN = H - 224;
+const input = {
+  left: false, right: false, up: false, down: false, keyFire: false, touchFire: false,
+  dragging: false, lastFx: 0, lastFy: 0, target: W / 2, targetY: Y_MAX,
+};
+// The Fire button in the corner (or the F key): off means the ship flies without shooting, so the guns can cool.
+// Every game starts with it on.
+let fireOn = true;
 let S = null;
 
 function newState() {
@@ -884,7 +898,7 @@ function newState() {
     mode: "play", t: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -894,7 +908,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0,
     },
   };
 }
@@ -1202,6 +1216,7 @@ function collect(kind) {
   if (kind === "candy") {
     S.stats.bags++; S.turbo = Math.min(12, S.turbo + 6); S.crash = 0;
     pop("*SNIFF*", P.x, P.y - 30, C.ink, 20); sfx.sniff();
+    if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
   } else if (kind === "card") {
     if (S.escort && S.escort.free) { pop("You've already got the hot one", P.x, P.y - 34, C.gold, 15); return; }
     if (S.cents <= 0) { pop("She saw your bank account", P.x, P.y - 34, C.pink, 15); return; }
@@ -1222,6 +1237,7 @@ function collect(kind) {
   } else if (kind === "eightball") {
     S.stats.eightballs++; S.tweak = Math.min(16, S.tweak + 8); S.crash = 0;
     pop("*8-BALL*", P.x, P.y - 30, C.cyan, 20); sfx.sniff();
+    if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
   } else {
     S.lives++; S.stats.cody++;
@@ -1247,13 +1263,17 @@ const STD = {
 };
 const drunkLevel = () => Math.min(3, Math.ceil(S.drinks));
 const payMult = () => 1 + 0.5 * drunkLevel();
+// Nose candy and the 8-ball sober the ship up for as long as they last: no sway, no stray shots, no double vision.
+// The drinks are still in there, so the pay bonus, the breathalyser and the blackout all carry on as before.
+const wired = () => S.turbo > 0 || S.tweak > 0;
+const sloppy = () => (wired() ? 0 : Math.min(S.drinks, 4));
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
 // Rounded up, because a drink starts wearing off the moment it lands and two quick beers should still blow .08.
 const bac = () => Math.ceil(S.drinks * 4 - 1e-6);
 const bacText = () => "." + String(bac()).padStart(2, "0");
 const sick = () => S.std.clap || S.std.crabs || (S.std.herpes && S.dormant <= 0);
 function wobble() {
-  const d = Math.max(0, Math.min(S.drinks, 4) - 1);
+  const d = Math.max(0, sloppy() - 1);
   let w = d * 11 * (Math.sin(S.t * 2.1) + 0.5 * Math.sin(S.t * 3.7));
   if (S.std.crabs) w += Math.sin(S.t * 27) * 4 + Math.sin(S.t * 43) * 2;
   return w;
@@ -1346,6 +1366,9 @@ function updateVices(dt) {
       if (S.banner && S.banner.max - S.banner.life < 2.4) {
         S.banner.life = S.banner.max;
         pop("Blacked out. 50 texts to your ex. -$5.00", P.x, P.y - 34, C.red, 16);
+      } else if (!S.brokeQuoted) {
+        S.brokeQuoted = true;
+        banner("These are costing me ten cents a piece, you jackass!", "Jo Bennett. You drunk texted your ex 50 times. That's $5.00.", C.red);
       } else banner("You blacked out", "You drunk texted your ex 50 times. That's $5.00.", C.red);
       sfx.burp();
     }
@@ -1374,19 +1397,33 @@ function updatePlayer(dt) {
   if (input.right) target = 1e4;
   P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), 16, W - 16);
   if (!input.dragging) input.target = P.x;
+  let targetY = input.dragging ? input.targetY : P.y;
+  if (input.up) targetY = -1e4;
+  if (input.down) targetY = 1e4;
+  P.y = clamp(P.y + clamp(targetY - P.y, -spd * dt, spd * dt), Y_MIN, Y_MAX);
+  if (!input.dragging) input.targetY = P.y;
 
+  // Shots are free, but the guns heat up. Boil over and they lock until they have cooled most of the way down.
+  // They cool slowly while firing and three times as fast while resting, which is what the Fire button is for.
   S.fireCd -= dt;
-  if ((input.keyFire || input.touchFire || gyro.on) && S.fireCd <= 0 && S.flare <= 0 && S.jam <= 0) {
-    // On an 8-ball the ship fires three at a time. Every one of them still costs ten cents.
-    const lanes = S.tweak > 0 ? [-55, 0, 55] : [0], spread = 22 * Math.min(S.drinks, 4);
+  const wants = input.keyFire || ((input.touchFire || gyro.on) && fireOn);
+  const firing = wants && !S.hot && S.flare <= 0 && S.jam <= 0;
+  S.heat = Math.max(0, S.heat - (firing ? 0.1 : 0.3) * dt);
+  if (S.hot && S.heat <= 0.4) { S.hot = false; pop("Guns are back", P.x, P.y - 34, C.cyan, 16); }
+  if (firing && S.fireCd <= 0) {
+    // On an 8-ball the ship fires three at a time.
+    const lanes = S.tweak > 0 ? [-55, 0, 55] : [0], spread = 22 * sloppy();
     for (const vx of lanes) S.bullets.push({ x: P.x, y: P.y - 18, vy: -540, vx: vx + rand(-1, 1) * spread });
-    S.cents -= 10 * lanes.length; S.billCents += 10 * lanes.length; S.shots += lanes.length;
+    S.shots += lanes.length;
     S.fireCd = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1) * (S.tweak > 0 ? 0.5 : 1);
     sfx.shoot();
-    if (S.cents < 0 && !S.brokeQuoted && !S.banner) {
-      S.brokeQuoted = true;
-      banner("These are costing me ten cents a piece, you jackass!", "Jo Bennett. You're in debt now.", C.red);
-      sfx.broke();
+    // Nose candy and the 8-ball are too wired to overheat: no heat builds while either is running.
+    if (S.turbo <= 0 && S.tweak <= 0) {
+      S.heat += 0.045;
+      if (S.heat >= 1) {
+        S.heat = 1; S.hot = true; S.stats.overheats++;
+        pop("OVERHEATED", P.x, P.y - 34, C.red, 20); burst(P.x, P.y - 16, C.ink, 10); sfx.broke();
+      }
     }
   }
 }
@@ -1461,7 +1498,7 @@ function update(dt) {
   if (S.mode === "intro") {
     S.introT += dt;
     if (!S.introBoom && S.introT >= 1.5 && S.introT < INTRO) { S.introBoom = true; sfx.boom(); }
-    if (S.introT >= INTRO) { S.mode = "play"; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
+    if (S.introT >= INTRO) { S.mode = "play"; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
     return;
   }
   S.t += dt;
@@ -1617,9 +1654,16 @@ function drawHUD(g) {
   g.textAlign = "left";
   g.font = `11px ${FONT_SIGN}`; g.fillStyle = C.dim; g.fillText("CASH", 12, 10);
   g.font = `30px ${FONT_HUD}`; g.fillStyle = S.cents < 0 ? C.red : C.gold; g.fillText(money(S.cents), 12, 21);
-  const bill = `Texting bill ${money(S.billCents)}`;
-  g.font = `16px ${FONT_HUD}`; g.fillStyle = C.dim; g.fillText(bill, 12, 48);
-  for (let i = 0, rx = 20 + g.measureText(bill).width; i < S.rubbers; i++, rx += 12) {
+  // Gun heat: a bar that fills as you fire and drains as you rest. Full means locked until it is back under 40%.
+  // The label reads HOLD while the Fire button is off.
+  g.font = `16px ${FONT_HUD}`;
+  g.fillStyle = S.hot ? (reduced || Math.floor(S.t * 8) % 2 ? C.red : C.ink) : fireOn ? C.dim : C.cyan;
+  g.fillText(fireOn || S.hot ? "HEAT" : "HOLD", 12, 48);
+  const hx = 18 + g.measureText("HEAT").width;
+  g.fillStyle = C.deep; g.fillRect(hx, 53, 60, 7);
+  g.fillStyle = S.hot || S.heat > 0.75 ? C.red : C.gold; g.fillRect(hx, 53, 60 * S.heat, 7);
+  g.strokeStyle = C.dim; g.lineWidth = 1; g.strokeRect(hx, 53, 60, 7);
+  for (let i = 0, rx = hx + 68; i < S.rubbers; i++, rx += 12) {
     g.fillStyle = C.cyan; g.fillRect(rx, 51, 9, 9);
     g.strokeStyle = C.void; g.lineWidth = 1; g.beginPath(); g.arc(rx + 4.5, 55.5, 2.6, 0, TAU); g.stroke();
   }
@@ -1634,7 +1678,7 @@ function drawHUD(g) {
   g.font = `16px ${FONT_HUD}`;
   if (S.drinks > 0) {
     g.fillStyle = bac() >= 8 ? C.red : C.gold;
-    g.fillText(`${DRUNK[drunkLevel()]} BAC ${bacText()} x${payMult()}`, W - 12, 52);
+    g.fillText(`${wired() ? "WIRED" : DRUNK[drunkLevel()]} BAC ${bacText()} x${payMult()}`, W - 12, 52);
   } else if (S.hangover > 0) { g.fillStyle = C.dim; g.fillText("HUNGOVER", W - 12, 52); }
   g.textAlign = "center";
   let y = 68;
@@ -1702,7 +1746,7 @@ function render() {
 
   // Past two drinks the room tilts. Ships, bugs and shots tilt together, so what you see is still what hits.
   // It pivots on the ship's row, so the ship and anything about to hit it never slide off the edge.
-  const sloshed = reduced ? 0 : Math.max(0, Math.min(S.drinks, 4) - 1);
+  const sloshed = reduced ? 0 : Math.max(0, sloppy() - 1);
   const tilt = Math.max(0, sloshed - 1) * 0.02 * Math.sin(S.t * 0.9);
   const tiltWorld = () => { ctx.translate(W / 2, S.player.y); ctx.rotate(tilt); ctx.translate(-W / 2, -S.player.y); };
   ctx.save(); tiltWorld();
@@ -1732,6 +1776,12 @@ function render() {
   const P = S.player;
   if (S.mode === "play" && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) {
     drawPlayer(ctx, P.x, P.y, S.t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
+    if (S.hot || S.heat > 0.55) {
+      ctx.globalAlpha = S.hot ? 0.55 + 0.45 * Math.sin(S.t * 20) : (S.heat - 0.55) * 2.2;
+      ctx.strokeStyle = C.red; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(P.x, P.y - 13, 12, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     if (S.flare > 0 || S.jam > 0) {
       ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.t * 30); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(P.x, P.y, 24, 0, TAU); ctx.stroke();
@@ -1876,6 +1926,7 @@ function buildSheet(c) {
       ["Bugs smashed", st.kills],
       ["Shots fired", S.shots],
       ["Accuracy", S.shots ? `${Math.round(100 * st.hits / S.shots)}%` : "n/a"],
+      ["Guns overheated", st.overheats],
       ["Cocks / tits", `${st.cocks} / ${st.tits}`],
       ["Bosses beaten", st.bosses],
       ["Choked out", st.chokes],
@@ -1918,7 +1969,7 @@ function showOver() {
   fillRows($("stats"), [
     ["Wave reached", S.wave],
     ["Bugs smashed", S.stats.kills],
-    ["Texting bill", `${money(S.billCents)} · ${S.shots} shots`],
+    ["Shots fired", S.shots],
     ["Drinks / DUIs", `${S.stats.beers} / ${S.stats.duis}`],
     ["STDs caught", stds ? stds[0].toUpperCase() + stds.slice(1) : "None. Somehow."],
     ["Bosses beaten", S.stats.bosses],
@@ -1930,6 +1981,7 @@ function showOver() {
   $("best").textContent = isBest ? "New personal best" : `Your best: ${money(best)}`;
   lastRun = { s: clamp(c, -100000, 10000000), w: S.wave };
   posted = null; postBtn.disabled = false; postStatus.textContent = "";
+  fireBtn.hidden = true; $("ver").hidden = false;
   $("over").hidden = false;
 }
 function start() {
@@ -1938,10 +1990,11 @@ function start() {
   // Shortcuts for testing the bosses: open the page with #boss1 to #boss4 on the end of the link (#bertha still works).
   const skip = /^#boss([1-4])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
-  if (introSeen) banner("Wave 1", "Every shot costs ten cents.", C.cyan);
-  else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
+  if (introSeen) banner("Wave 1", "Guns overheat. Tap Fire to rest them.", C.cyan);
+  else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
-  input.target = W / 2; input.touchFire = false; input.dragging = false;
+  input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
+  fireOn = true; syncFire(); fireBtn.hidden = false; $("ver").hidden = true;
   if (gyro.wanted && !gyro.on && TILT_OK) setGyro(true);
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
@@ -2041,7 +2094,11 @@ $("postForm").addEventListener("submit", async (e) => {
 });
 
 // ---------- input ----------
-const toX = (e) => { const r = cv.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * W; };
+const toXY = (e) => {
+  const r = cv.getBoundingClientRect();
+  return [((e.clientX - r.left) / r.width) * W, typeof e.clientY === "number" ? ((e.clientY - r.top) / r.height) * H : input.lastFy];
+};
+let steerId = null;
 // Touches count anywhere on the page, not just on the game, so the thumb can work from the pad underneath.
 document.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" && !touched) { touched = true; relayout(); }
@@ -2052,33 +2109,45 @@ document.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
+  // One finger steers; a second one landing changes nothing.
+  if (input.dragging) return;
+  steerId = e.pointerId === undefined ? null : e.pointerId;
+  [input.lastFx, input.lastFy] = toXY(e);
   // The ship already sits at its anchor plus the drunk sway, so anchor the drag without the sway or it counts twice.
-  input.dragging = true; input.touchFire = true; input.lastFx = toX(e); input.target = clamp(S.player.x - S.player.wob, 16, W - 16);
+  input.dragging = true; input.touchFire = true;
+  input.target = clamp(S.player.x - S.player.wob, 16, W - 16); input.targetY = S.player.y;
 });
+const mine = (e) => !e || e.pointerId === undefined || steerId === null || e.pointerId === steerId;
 document.addEventListener("pointermove", (e) => {
-  if (!input.dragging) return;
-  const x = toX(e);
+  if (!input.dragging || !mine(e)) return;
+  const [x, y] = toXY(e);
   input.target = clamp(input.target + (x - input.lastFx) * 1.3, 16, W - 16);
-  input.lastFx = x;
+  input.targetY = clamp(input.targetY + (y - input.lastFy) * 1.3, Y_MIN, Y_MAX);
+  input.lastFx = x; input.lastFy = y;
 });
-const release = () => { input.dragging = false; input.touchFire = false; };
+const release = (e) => { if (!mine(e)) return; input.dragging = false; input.touchFire = false; steerId = null; };
 document.addEventListener("pointerup", release);
 document.addEventListener("pointercancel", release);
 cv.addEventListener("lostpointercapture", release);
-const FIRE = ["Space", "ArrowUp", "KeyW"], LEFT = ["ArrowLeft", "KeyA"], RIGHT = ["ArrowRight", "KeyD"];
+const FIRE = ["Space"], LEFT = ["ArrowLeft", "KeyA"], RIGHT = ["ArrowRight", "KeyD"], UP = ["ArrowUp", "KeyW"], DOWN = ["ArrowDown", "KeyS"];
 addEventListener("keydown", (e) => {
   if (S && S.mode === "intro") { if (!e.repeat) S.introT = INTRO; return; }
   if (!S || S.mode !== "play") return;
   if (LEFT.includes(e.code)) { input.left = true; e.preventDefault(); }
   if (RIGHT.includes(e.code)) { input.right = true; e.preventDefault(); }
+  if (UP.includes(e.code)) { input.up = true; e.preventDefault(); }
+  if (DOWN.includes(e.code)) { input.down = true; e.preventDefault(); }
   if (FIRE.includes(e.code)) { input.keyFire = true; e.preventDefault(); }
+  if (e.code === "KeyF" && !e.repeat) toggleFire();
 });
 addEventListener("keyup", (e) => {
   if (LEFT.includes(e.code)) input.left = false;
   if (RIGHT.includes(e.code)) input.right = false;
+  if (UP.includes(e.code)) input.up = false;
+  if (DOWN.includes(e.code)) input.down = false;
   if (FIRE.includes(e.code)) input.keyFire = false;
 });
-addEventListener("blur", () => { input.left = input.right = input.keyFire = false; release(); });
+addEventListener("blur", () => { input.left = input.right = input.up = input.down = input.keyFire = false; release(); });
 
 $("play").addEventListener("click", start);
 $("again").addEventListener("click", start);
@@ -2119,6 +2188,11 @@ syncGyro();
 // A saved choice comes back on its own where no permission is needed. On an iPhone it comes back at the next Play tap.
 if (gyro.wanted && TILT_OK && typeof DeviceOrientationEvent.requestPermission !== "function") setGyro(true);
 
+const fireBtn = $("fire");
+function syncFire() { fireBtn.textContent = fireOn ? "Fire on" : "Fire off"; fireBtn.setAttribute("aria-pressed", String(fireOn)); }
+function toggleFire() { fireOn = !fireOn; syncFire(); }
+fireBtn.addEventListener("click", () => { toggleFire(); fireBtn.blur(); });
+syncFire();
 const muteBtn = $("mute");
 function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
 muteBtn.addEventListener("click", () => { muted = !muted; store.set("sd-muted", muted); syncMute(); ensureAudio(); muteBtn.blur(); });
@@ -2129,7 +2203,7 @@ let last = performance.now(), paused = false;
 document.addEventListener("visibilitychange", () => {
   paused = document.hidden;
   last = performance.now();
-  if (paused) { input.left = input.right = input.keyFire = false; release(); }
+  if (paused) { input.left = input.right = input.up = input.down = input.keyFire = false; release(); }
 });
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
