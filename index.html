@@ -277,7 +277,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v14</span>
+  <span id="ver">v15</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -497,7 +497,13 @@ function drawBug(g, type, x, y, t, flash, damaged) {
 }
 function drawDrop(g, kind, x, y, t) {
   g.save(); g.translate(x, y + Math.sin(t * 4) * 1.5);
-  if (kind === "candy") {
+  if (kind === "dmt") {
+    // A little black hole of your own: three coloured arcs chasing each other round a dark middle.
+    g.shadowColor = C.lime; g.shadowBlur = 10;
+    g.fillStyle = C.void; g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.fill();
+    g.shadowBlur = 0; g.lineWidth = 2.4; g.lineCap = "round";
+    [C.lime, C.pink, C.cyan].forEach((c, i) => { g.strokeStyle = c; g.beginPath(); g.arc(0, 0, 8.5, t * 5 + i * 2.1, t * 5 + i * 2.1 + 1.5); g.stroke(); });
+  } else if (kind === "candy") {
     g.shadowColor = C.ink; g.shadowBlur = 10;
     g.fillStyle = C.ink; g.fillRect(-7, -8, 14, 16);
     g.shadowBlur = 0;
@@ -934,7 +940,7 @@ function drawIcons() {
     } else if (k === "tit") {
       g.scale(1.1, 1.1); drawTit(g, -1, 0, 0.1, 1, false);
     } else if (k === "bertha") {
-      g.scale(0.29, 0.29); drawBertha(g, 0, 8, 0, false, false);
+      g.scale(0.2, 0.2); drawBertha(g, 0, -5, 0, false, false);
     } else if (k === "cop") {
       g.scale(0.5, 0.5); drawCop(g, 0, 8, 0, false);
     } else {
@@ -996,7 +1002,7 @@ function newState() {
     mode: "play", t: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpWave: 0,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpWave: 0, realm: null, dmtWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1006,7 +1012,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0,
     },
   };
 }
@@ -1154,8 +1160,8 @@ function hitFlyer(f, dmg = 1) {
 const BOSS_Y = 172;
 const BOSS_ORDER = ["bertha", "jones", "pimp", "sheriff", "wife"];
 const BOSSES = {
-  bertha: { name: "Big Bertha", draw: drawBertha, intro: ["Boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy. Tentacles by Chandler."], down: ["Bertha's down", "The hot one is free. She fights for you, no charge."] },
-  jones: { name: "Jon Jones", draw: drawJones, intro: ["Boss: Jon Jones", "You're drunk, you're high, and you just called out the GOAT."], down: ["And new", "You beat Jon Jones. Nobody is going to believe you. The belt pays $100."] },
+  bertha: { name: "Big Bertha", draw: drawBertha, hw: 58, hb: 62, intro: ["Boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy. Tentacles by Chandler."], down: ["Bertha's down", "The hot one is free. She fights for you, no charge."] },
+  jones: { name: "Jon Jones", draw: drawJones, hw: 54, intro: ["Boss: Jon Jones", "You're drunk, you're high, and you just called out the GOAT."], down: ["And new", "You beat Jon Jones. Nobody is going to believe you. The belt pays $100."] },
   pimp: { name: "Big Daddy Velvet", draw: drawPimp, intro: ["Boss: Big Daddy Velvet", "The escorts work for him. He wants his cut."], down: ["Velvet's out of business", "One of his girls works for you now. No charge."] },
   sheriff: { name: "Sheriff Buzzkill", draw: drawSheriff, intro: ["Boss: Sheriff Buzzkill", "License, registration and a breathalyzer."], down: ["The sheriff's down", "Charges dropped. Your DUI fines come back."] },
   wife: { name: "Your Wife", draw: drawWife, intro: ["Boss: your wife", "She saw the escort charges on the statement."], down: ["She's cooled off", "You're on the couch tonight. +1 life."] },
@@ -1246,7 +1252,7 @@ function hitBoss(B, dmg = 1) {
   if (B.hp > 0) {
     if (!B.balls && B.hp < B.maxHp / 2) {
       B.balls = 1; dropEightBall(B);
-      if (B.key === "jones") banner("Roid rage", "He swears it was a tainted supplement. Everything he throws is faster now.", C.red);
+      if (B.key === "jones") banner("Roid rage", "He swears it was a tainted supplement. He hits faster and throws more.", C.red);
     }
     if (Math.floor(B.hp) % 3 === 0) sfx.tink();
     return;
@@ -1321,6 +1327,10 @@ function hitBug(b, dmg = 1) {
   else if (r < 0.32 && sick() && !S.drops.some((d) => d.kind === "clinic")) kind = "clinic";
   else if (r < 0.36) kind = "dime";
   else if (r < 0.375) kind = "eighth";
+  // DMT, as ordered by Jeremy: at most one a wave. Wave 2 always coughs one up so everybody sees the realm; after that it is luck.
+  if (S.dmtWave !== S.wave && !S.realm && (Math.random() < 0.015 || (S.wave === 2 && S.bugs.filter((o) => !o.dead).length <= 12))) {
+    kind = "dmt"; S.dmtWave = S.wave;
+  }
   if (kind) S.drops.push({ kind, x: b.x, y: b.y, vy: 85 });
 }
 function collect(kind) {
@@ -1351,8 +1361,10 @@ function collect(kind) {
     S.stats.eightballs++; S.tweak = Math.min(16, S.tweak + 8); S.crash = 0;
     pop("*8-BALL*", P.x, P.y - 30, C.cyan, 20); sfx.sniff();
     S.hot = false; S.heat = 0;
-    if (S.drinks > 2 && S.bumpWave !== S.wave) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
+    if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
+  } else if (kind === "dmt") {
+    enterRealm();
   } else {
     S.lives++; S.stats.cody++;
     banner("Navy SEAL Cody", "has entered the chat. +1 life", C.gold); sfx.power();
@@ -1375,12 +1387,68 @@ function hurt(title, sub) {
   if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; input.touchFire = false; }
 }
 
+// ---------- the DMT realm, as ordered by Jeremy: a black hole opens, and on the far side machine elves pay cash ----------
+// While you are in there the world outside stands still: bugs, bosses, shots and drops all wait. Your own buzz does not.
+// Nothing in the realm can hurt you. Five squads of eight come out of the door in the middle; get all forty for a bonus.
+const REALM = { in: 1.3, out: 1, squads: 5, per: 8, every: 2.6, cross: 3.6, pay: 200, perfect: 5000 };
+// Where an elf is, a fraction u of the way along its squad's path.
+function elfAt(path, u) {
+  const a = u * TAU;
+  if (path === 0) return [-20 + 400 * u, 150 + 60 * Math.sin(a * 1.5)];
+  if (path === 1) return [380 - 400 * u, 300 + 60 * Math.sin(a * 1.5)];
+  if (path === 2) { const r = 20 + 120 * Math.sin(Math.PI * u); return [W / 2 + Math.cos(a * 2) * r, 230 + Math.sin(a * 2) * r * 0.85]; }
+  if (path === 3) return [W / 2 + 150 * Math.sin(a), 230 + 110 * Math.sin(a * 2)];
+  return [W / 2 - 150 * Math.sin(a), 230 + 120 * Math.sin(a * 2)];
+}
+function enterRealm() {
+  const P = S.player;
+  S.realm = { phase: "in", t: 0, x: P.x, y: P.y, elves: [], sent: 0, killed: 0, cents: 0 };
+  S.stats.trips++; S.bullets = [];
+  banner("DMT", "The portal is open. Machine elves pay cash.", C.lime); sfx.power();
+}
+function leaveRealm() {
+  const R = S.realm, P = S.player, all = REALM.squads * REALM.per, perfect = R.killed === all;
+  if (perfect) { S.cents += REALM.perfect; S.stats.earned += REALM.perfect; R.cents += REALM.perfect; }
+  // Back where you left from, with a moment's grace before anything can touch you.
+  P.x = R.x; P.y = R.y; input.target = clamp(P.x, edgeX(), W - edgeX()); input.targetY = P.y; P.inv = Math.max(P.inv, 2);
+  S.bullets = []; S.realm = null;
+  banner(perfect ? "Perfect trip" : "Back from the realm", `${R.killed} of ${all} machine elves. ${R.cents ? "+" + money(R.cents) : "They got away with it"}${perfect ? ", bonus included" : ""}.`, C.lime);
+  sfx.power();
+}
+function updateRealm(dt) {
+  const R = S.realm, P = S.player, all = REALM.squads * REALM.per;
+  R.t += dt;
+  if (R.phase === "in") {
+    if (R.t >= REALM.in) { R.phase = "fight"; R.t = 0; P.x = W / 2; P.y = Y_MAX; input.target = P.x; input.targetY = P.y; }
+  } else if (R.phase === "fight") {
+    updatePlayer(dt);
+    while (R.sent < all && R.t >= 0.5 + Math.floor(R.sent / REALM.per) * REALM.every + (R.sent % REALM.per) * 0.22) {
+      R.elves.push({ path: Math.floor(R.sent / REALM.per), age: 0, hue: R.sent, x: -99, y: -99 }); R.sent++;
+    }
+    for (const e of R.elves) { e.age += dt; [e.x, e.y] = elfAt(e.path, e.age / REALM.cross); if (e.age >= REALM.cross) e.dead = true; }
+    for (const s of S.bullets) { s.x += (s.vx || 0) * dt; s.y += s.vy * dt; }
+    for (const s of S.bullets) {
+      for (const e of R.elves) {
+        if (s.dead || e.dead || Math.abs(s.x - e.x) > 13 || Math.abs(s.y - e.y) > 13) continue;
+        s.dead = true; e.dead = true; S.stats.hits++;
+        const v = REALM.pay * payMult();
+        S.cents += v; S.stats.earned += v; R.cents += v; R.killed++; S.stats.elves++;
+        pop("+" + money(v), e.x, e.y, C.gold, 15); burst(e.x, e.y, pick([C.pink, C.cyan, C.lime, C.gold]), 12); sfx.pop();
+      }
+    }
+    R.elves = R.elves.filter((e) => !e.dead);
+    S.bullets = S.bullets.filter((s) => !s.dead && s.y > -20);
+    if (R.sent === all && !R.elves.length) { R.phase = "out"; R.t = 0; S.bullets = []; }
+  } else if (R.t >= REALM.out) leaveRealm();
+  updateFx(dt);
+}
+
 // ---------- booze and STDs ----------
 const DRUNK = ["", "BUZZED", "DRUNK", "HAMMERED"];
 const STD = {
-  clap: ["clap", "You caught the clap", "It burns when you fire. Guns are slower."],
-  crabs: ["crabs", "You've got crabs", "Can't stop scratching. Good luck holding still."],
-  herpes: ["herpes", "Herpes", "Flare-ups jam your guns. It never really leaves."],
+  clap: ["clap", "You caught the clap", "It burns when you fire. Guns are slower. Grab the next free clinic."],
+  crabs: ["crabs", "You've got crabs", "Can't stop scratching. Good luck holding still. Grab the next free clinic."],
+  herpes: ["herpes", "Herpes", "Flare-ups jam your guns. It never really leaves, but a free clinic puts it to sleep."],
 };
 const drunkLevel = () => Math.min(3, Math.ceil(S.drinks));
 const payMult = () => 1 + 0.5 * drunkLevel();
@@ -1390,8 +1458,8 @@ const punch = () => payMult();
 // The drinks are still in there, so the pay bonus, the breathalyser and the blackout all carry on as before.
 const wired = () => S.turbo > 0 || S.tweak > 0;
 const sloppy = () => (wired() ? 0 : Math.min(S.drinks, 4));
-// Jeremy's key bump: a sniff with three or more beers on board stops the world for a beat and says so.
-// Once a wave, at his request; after that the same sniff just gets the small pop.
+// Jeremy's key bump: a sniff of nose candy with three or more beers on board stops the world for a beat and says so.
+// Once a wave, and never for the 8-ball, at his request; otherwise the sniff just gets the small pop.
 const BUMP = 0.75;
 function keyBump() { S.bump = BUMP; S.bumpWave = S.wave; S.shake = 0; S.stats.bumps++; sfx.power(); }
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
@@ -1546,7 +1614,7 @@ function updatePlayer(dt) {
     S.fireCd = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1) * (S.tweak > 0 ? 0.5 : 1);
     sfx.shoot();
     // Nose candy and the 8-ball are too wired to overheat: no heat builds while either is running.
-    if (S.turbo <= 0 && S.tweak <= 0) {
+    if (S.turbo <= 0 && S.tweak <= 0 && !S.realm) {
       S.heat += 0.045;
       if (S.heat >= 1) {
         S.heat = 1; S.hot = true; S.stats.overheats++;
@@ -1647,6 +1715,7 @@ function update(dt) {
     if (S.turbo <= 0) { S.turbo = 0; S.crash = 2.6; pop("THE CRASH", P.x, P.y - 34, C.dim, 20); sfx.crash(); }
   } else if (S.crash > 0) S.crash = Math.max(0, S.crash - dt);
   updateVices(dt);
+  if (S.realm) { updateRealm(dt); return; }
 
   // While you're high, everything that is out to get you runs slow. You don't.
   const edt = dt * (S.high > 0 ? S.slow : 1);
@@ -1701,7 +1770,7 @@ function update(dt) {
       if (hit) { s.dead = true; if (!s.heart) S.stats.hits++; hitFlyer(f, s.heart ? 1 : punch()); }
     }
     const B = S.boss;
-    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B, s.heart ? 1 : punch()); }
+    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < (BOSSES[B.key].hw || 40) && s.y > B.y - 58 && s.y < B.y + (BOSSES[B.key].hb || 44)) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B, s.heart ? 1 : punch()); }
   }
 
   if (S.mode === "play") {
@@ -1845,6 +1914,7 @@ function drawHUD(g) {
   // The STD list sits in the empty strip under the ship, so nothing is ever printed over the bugs.
   g.font = `17px ${FONT_HUD}`;
   const boosts = [];
+  if (S.realm && S.realm.phase === "fight") boosts.push([`DMT REALM · ${S.realm.killed} of ${REALM.squads * REALM.per} machine elves`, `DMT ${S.realm.killed}/${REALM.squads * REALM.per}`, C.lime]);
   if (S.turbo > 0) boosts.push([`NOSE CANDY TURBO ${S.turbo.toFixed(1)}s · ${Math.round(110 + S.turbo * 9)} BPM`, `TURBO ${S.turbo.toFixed(1)}s`, C.pink]);
   else if (S.crash > 0) boosts.push(["THE CRASH · everything is slow", "CRASH", C.dim]);
   if (S.high > 0) boosts.push([`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, `HIGH ${S.high.toFixed(1)}s`, C.lime]);
@@ -1883,6 +1953,80 @@ function drawBanner(g) {
   g.shadowBlur = 0;
   g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink;
   for (const l of subs) { g.fillText(l, W / 2, y + 2); y += 19; }
+  g.globalAlpha = 1;
+}
+// A machine elf: a jester made of triangles that will not hold still.
+function drawElf(g, x, y, t, hue) {
+  const cols = [C.lime, C.pink, C.cyan, C.gold];
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 6 + hue) * 0.4);
+  g.fillStyle = cols[hue % 4]; g.beginPath(); g.moveTo(0, -12); g.lineTo(11, 7); g.lineTo(-11, 7); g.closePath(); g.fill();
+  g.fillStyle = cols[(hue + 1) % 4];
+  g.beginPath(); g.moveTo(-10, -6); g.lineTo(-4, -17); g.lineTo(0, -8); g.lineTo(4, -17); g.lineTo(10, -6); g.closePath(); g.fill();
+  g.fillStyle = cols[(hue + 2) % 4];
+  g.beginPath(); g.arc(-4, -17, 1.8, 0, TAU); g.fill(); g.beginPath(); g.arc(4, -17, 1.8, 0, TAU); g.fill();
+  g.fillStyle = C.ink;
+  g.beginPath(); g.arc(-3.5, -1, 2.5, 0, TAU); g.fill(); g.beginPath(); g.arc(3.5, -1, 2.5, 0, TAU); g.fill();
+  const look = Math.sin(t * 9 + hue);
+  g.fillStyle = C.void;
+  g.beginPath(); g.arc(-3.5 + look, -1, 1, 0, TAU); g.fill(); g.beginPath(); g.arc(3.5 + look, -1, 1, 0, TAU); g.fill();
+  g.strokeStyle = C.void; g.lineWidth = 1.4; g.beginPath(); g.arc(0, 2.5, 4, 0.2, Math.PI - 0.2); g.stroke();
+  g.restore();
+}
+function drawPortal(g, x, y, r, t) {
+  const cols = [C.pink, C.cyan, C.gold, C.lime];
+  g.save(); g.translate(x, y); g.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const a = (reduced ? 0 : t * (2 + i)) + i * 1.7;
+    g.strokeStyle = cols[i]; g.lineWidth = 3; g.globalAlpha = 0.85;
+    g.beginPath(); g.arc(0, 0, r + 4 + i * 5, a, a + 2.2); g.stroke();
+  }
+  g.globalAlpha = 1; g.fillStyle = C.void; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+  g.restore();
+}
+// Stained glass and mandalas, from the reference Jeremy sent: rings of petals in turn-about colours round a middle point.
+function drawMandala(g, x, y, r, t, alpha) {
+  const cols = [C.pink, C.cyan, C.lime, C.gold];
+  g.save(); g.translate(x, y); g.lineWidth = 1.5;
+  for (let ring = 0; ring < 4; ring++) {
+    const n = 8 + ring * 4, out = r * (0.28 + ring * 0.24), spin = (ring % 2 ? -1 : 1) * (reduced ? 0 : t * 0.4);
+    g.globalAlpha = alpha * (0.55 - ring * 0.08); g.strokeStyle = cols[ring];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + spin, px = Math.cos(a) * out, py = Math.sin(a) * out;
+      g.beginPath(); g.ellipse(px, py, r * 0.12, r * 0.045 * (1 + 0.3 * Math.sin(t * 3 + ring)), a, 0, TAU); g.stroke();
+    }
+  }
+  g.restore(); g.globalAlpha = 1;
+}
+function drawRealm(g) {
+  const R = S.realm, P = S.player, t = S.t, cx = W / 2, cy = 300, cols = [C.pink, C.cyan, C.lime, C.gold];
+  if (R.phase !== "fight") {
+    // Going in: patterns creep over everything, the hole opens and the ship spirals down it. Coming out is the same thing backwards.
+    const k = clamp(R.t / (R.phase === "in" ? REALM.in : REALM.out), 0, 1), f = R.phase === "in" ? k : 1 - k;
+    drawMandala(g, cx, cy, 190, t, f);
+    drawPortal(g, cx, cy, 8 + ease(Math.min(1, f * 1.6)) * 62, t);
+    const turn = f * 9, far = (1 - f) * Math.hypot(R.x - cx, R.y - cy), from = Math.atan2(R.y - cy, R.x - cx), z = 1 - f * 0.85;
+    g.save(); g.translate(cx + Math.cos(from + turn) * far, cy + Math.sin(from + turn) * far); g.rotate(turn * 1.5); g.scale(z, z);
+    for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, gx, 0, t, false, false);
+    g.restore();
+    return;
+  }
+  // Inside: a tunnel of glowing shapes coming at you, with a mandala turning in the middle of it.
+  g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
+  g.save(); g.translate(cx, 230);
+  for (let i = 0; i < 12; i++) {
+    const f = ((i + (reduced ? 0 : t * 0.6)) % 12) / 12, r = 16 + f * 340, sides = 3 + (i % 4), turn = (i % 2 ? 1 : -1) * (reduced ? 0 : t * 0.5) + i;
+    g.globalAlpha = 0.08 + 0.3 * (1 - f); g.strokeStyle = cols[i % 4]; g.lineWidth = 1.5 + f * 5;
+    g.beginPath();
+    for (let j = 0; j <= sides; j++) { const a = (j / sides) * TAU + turn; if (j) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    g.stroke();
+  }
+  g.restore(); g.globalAlpha = 1;
+  drawMandala(g, cx, 230, 150, t, 0.7);
+  drawPortal(g, cx, 230, 13, t);
+  for (const e of R.elves) drawElf(g, e.x, e.y, t, e.hue);
+  for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + t * 8)) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
+  for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, P.x + gx, P.y, t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
+  for (const p of S.parts) { g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.color; g.fillRect(p.x, p.y, p.size, p.size); }
   g.globalAlpha = 1;
 }
 // The key bump card: a key with a little pile on the end of it, as specified.
@@ -1965,7 +2109,7 @@ function render() {
   }
   if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t, S.escort.free);
   const P = S.player;
-  if (S.mode === "play" && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) {
+  if (S.mode === "play" && !S.realm && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) {
     for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(ctx, P.x + gx, P.y, S.t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
     if (S.hot || S.heat > 0.55) {
       ctx.globalAlpha = S.hot ? (reduced ? 0.9 : 0.55 + 0.45 * Math.sin(S.t * 20)) : (S.heat - 0.55) * 2.2;
@@ -1998,6 +2142,8 @@ function render() {
   }
   if (S.high > 0) { ctx.globalAlpha = 0.08; ctx.fillStyle = C.lime; ctx.fillRect(-12, -12, W + 24, H + 24); }
   ctx.globalAlpha = 1;
+  // The realm is painted over the frozen world, so the world is still there, exactly as you left it, when you get back.
+  if (S.realm) drawRealm(ctx);
 
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const p of S.pops) {
@@ -2011,7 +2157,7 @@ function render() {
     drawHUD(ctx); drawBanner(ctx);
     // Enemy shots go on top of everything so a banner can never hide one.
     ctx.save(); tiltWorld();
-    for (const e of S.ebullets) drawEnemyShot(ctx, e, S.t);
+    if (!S.realm || S.realm.phase !== "fight") for (const e of S.ebullets) drawEnemyShot(ctx, e, S.t);
     ctx.restore();
     if (S.blackout > 0) {
       ctx.globalAlpha = clamp(Math.min((2.4 - S.blackout) / 0.25, S.blackout / 0.4), 0, 1);
@@ -2124,6 +2270,7 @@ function buildSheet(c) {
       ["Choked out", st.chokes],
       ["Ships stolen / won back", `${st.captured} / ${st.rescued}`],
       ["Key bumps", st.bumps],
+      ["Trips to the realm / elves", `${st.trips} / ${st.elves}`],
       ["Navy SEAL rescues", st.cody],
       ["Hits taken", tally(st.hitsBy) || "None"],
       ["Finished off by", st.lastHit || "Nothing"],
