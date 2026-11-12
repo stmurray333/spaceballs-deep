@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c0716">
 <title>Spaceballs Deep</title>
-<meta name="description" content="Space bugs, escorts, nose candy, booze and STDs. As ordered by Jeremy.">
+<meta name="description" content="Galactic escorts, nose candy and booze. As ordered by Jeremy.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Monoton&family=VT323&display=swap">
@@ -226,7 +226,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
   <section id="title" class="overlay">
     <h1 class="neon"><span>Spaceballs</span><br><span class="gold">D<span class="flick">e</span>ep</span></h1>
-    <p class="tag">Escorts, nose candy, booze and STDs.<br><em>As ordered by Jeremy.</em></p>
+    <p class="tag">Galactic escorts, nose candy and booze.<br><em>As ordered by Jeremy.</em></p>
     <div class="legend">
       <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Bugs</b><span>$1 to $5 a pop</span></div></div>
       <div class="item"><canvas data-icon="candy" aria-hidden="true"></canvas><div><b>Nose candy</b><span>Turbo, then a crash</span></div></div>
@@ -234,7 +234,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
       <div class="item"><canvas data-icon="card" aria-hidden="true"></canvas><div><b>Escort</b><span>Wingwoman. $1/sec</span></div></div>
       <div class="item"><canvas data-icon="rooster" aria-hidden="true"></canvas><div><b>Cocks and tits</b><span>$10 and $3. Birds</span></div></div>
       <div class="item"><canvas data-icon="cody" aria-hidden="true"></canvas><div><b>Navy SEAL Cody</b><span>+1 life</span></div></div>
-      <div class="item"><canvas data-icon="waffle" aria-hidden="true"></canvas><div><b>Waffle House</b><span>Rare. Clears screen</span></div></div>
+      <div class="item"><canvas data-icon="waffle" aria-hidden="true"></canvas><div><b>Waffle House</b><span>Employee training</span></div></div>
       <div class="item"><canvas data-icon="bertha" aria-hidden="true"></canvas><div><b>Bosses</b><span>One every 3 waves</span></div></div>
       <div class="item"><canvas data-icon="beer" aria-hidden="true"></canvas><div><b>Booze</b><span>More pay and power</span></div></div>
       <div class="item"><canvas data-icon="cop" aria-hidden="true"></canvas><div><b>DUI checkpoint</b><span>Dodge the light</span></div></div>
@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v23</span>
+  <span id="ver">v24</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1279,8 +1279,8 @@ const BOSSES = {
 // Every boss coughs up an 8-ball when the fight starts and another when it turns ugly.
 function dropEightBall(B) { S.drops.push({ kind: "eightball", x: clamp(B.x + rand(-70, 70), 30, W - 30), y: B.y + 44, vy: 70 }); }
 function spawnBoss() {
-  const key = BOSS_ORDER[S.bossCount++ % BOSS_ORDER.length], hp = 60 + (S.bossCount - 1) * 30;
-  S.boss = { key, x: W / 2, y: -70, hp, maxHp: hp, ft: 0, sway: 0, state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0, balls: 0 };
+  const key = BOSS_ORDER[S.bossCount++ % BOSS_ORDER.length], hp = 110 + (S.bossCount - 1) * 45;
+  S.boss = { key, x: W / 2, y: -70, hp, maxHp: hp, ft: 0, sway: 0, tx: W / 2, hop: 0.6, dip: 0, dipCd: rand(4, 6), state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0, balls: 0 };
   S.bugs = [];
   banner(BOSSES[key].intro[0], BOSSES[key].intro[1], C.pink);
   sfx.warn();
@@ -1348,18 +1348,29 @@ function updateBoss(dt) {
     return;
   }
   B.ft += dt;
-  // A boss weaves: a wide sweep with a quicker wobble on top of it, rising and falling as it goes. Past half health it does all of it a third faster.
-  // The weave runs on its own clock so that speeding up never makes it jump.
-  B.sway += dt * (B.hp < B.maxHp / 2 ? 1.35 : 1);
-  // How far it goes depends on how wide it is, so tentacles and gun barrels stay on the screen.
-  const reach = W / 2 - (BOSSES[B.key].hw || 40) - 20;
-  B.x = W / 2 + (Math.sin(B.sway * 0.9) * 0.78 + Math.sin(B.sway * 2.3) * 0.22) * reach;
-  B.y = BOSS_Y + 16 * Math.min(1, B.sway) + Math.sin(B.sway * 1.3) * 20 + Math.sin(B.sway * 3.1) * 6;
+  // A boss does not hold still (as ordered by Jeremy, twice). It darts to a new spot every second or so, bobbing as it goes,
+  // and every few seconds it drops down toward the ship and climbs back. Past half health it does all of it faster.
+  // How far sideways it goes depends on how wide it is, so tentacles and gun barrels stay on the screen.
+  const mad = B.hp < B.maxHp / 2, reach = W / 2 - (BOSSES[B.key].hw || 40) - 20;
+  B.sway += dt * (mad ? 1.5 : 1.1);
+  B.hop -= dt;
+  if (B.hop <= 0) {
+    // The next spot is always a real move away, never a shuffle.
+    for (let i = 0; i < 8 && Math.abs(B.tx - B.x) < 70; i++) B.tx = W / 2 + rand(-reach, reach);
+    B.hop = rand(0.7, 1.5) * (mad ? 0.7 : 1);
+  }
+  const run = (mad ? 330 : 250) * dt;
+  B.x += clamp(B.tx - B.x, -run, run);
+  B.dipCd -= dt;
+  if (B.dipCd <= 0) { B.dip = 1.2; B.dipCd = rand(5, 8) * (mad ? 0.7 : 1); }
+  B.dip = Math.max(0, B.dip - dt);
+  B.y = BOSS_Y + 16 * Math.min(1, B.sway) + Math.sin(B.sway * 1.3) * 18 + Math.sin(B.sway * 3.1) * 6 + Math.sin(Math.PI * (1 - B.dip / 1.2)) * 84;
   if (S.mode !== "play") return;
   B.atkCd -= dt;
-  if (B.atkCd <= 0) {
+  // It holds its fire while it is down low, where a row of shots would start too close to dodge.
+  if (B.atkCd <= 0 && B.dip <= 0) {
     bossAttack(B);
-    B.atkCd = (B.hp < B.maxHp / 2 ? 1.7 : 2.2) - Math.min(0.5, (S.bossCount - 1) * 0.15);
+    B.atkCd = (mad ? 1.45 : 1.9) - Math.min(0.5, (S.bossCount - 1) * 0.15);
   }
 }
 function hitBoss(B, dmg = 1) {
@@ -1520,24 +1531,27 @@ function waffleHouse() {
   sfx.boom();
 }
 
-// ---------- the DMT realm, as ordered by Jeremy: a challenge stage like the ones in Galaga, one in every four waves ----------
-// When wave 2, 6, 10 and so on is cleared, a black hole opens and takes the ship somewhere else for a while.
-// Each trip is a little different: the colours turn and the squads come in another order.
+// ---------- the DMT realm, as ordered by Jeremy: a challenge stage like the ones in Galaga, one in every six waves ----------
+// When wave 2, 8, 14 and so on is cleared, a black hole opens and takes the ship somewhere else for a while.
+// Every trip is to a different place: there are three, the colours turn each time, and the squads come in another order.
 // The world outside stands still. Nothing in the realm can hurt you. Eight squads of ten machine elves come through
-// and every one you hit pays; get all eighty for a bonus. Then you are put back, and the next wave or boss turns up as usual.
+// in from the top corners, and every one you hit pays; get all eighty and the whole take is doubled.
+// Then you are put back, and the next wave or boss turns up as usual.
 // A squad's ten come 0.16s apart, which keeps the whole squad inside the 1.6s before the next one starts.
-const REALM = { in: 1.3, out: 1, squads: 8, per: 10, every: 1.6, gap: 0.16, cross: 3.2, pay: 200, perfect: 10000 };
-// Where an elf is, a fraction u of the way along its squad's path. Most of the paths start and end at the door in the middle.
+const REALM = { in: 1.3, out: 1, squads: 8, per: 10, every: 1.6, gap: 0.16, cross: 3.2, pay: 200 };
+// Where a target is, a fraction u of the way along its squad's path. There are four shapes, each flown from the top left
+// (even paths) or mirrored from the top right (odd paths), and every one of them leaves the screen again at the end.
 function elfAt(path, u) {
-  const a = u * TAU, cx = W / 2;
-  if (path === 0) return [-20 + 400 * u, 150 + 60 * Math.sin(a * 1.5)];
-  if (path === 1) return [380 - 400 * u, 300 + 60 * Math.sin(a * 1.5)];
-  if (path === 2) { const r = 20 + 120 * Math.sin(Math.PI * u); return [cx + Math.cos(a * 2) * r, 230 + Math.sin(a * 2) * r * 0.85]; }
-  if (path === 3) return [cx + 150 * Math.sin(a), 230 + 110 * Math.sin(a * 2)];
-  if (path === 4) return [cx - 150 * Math.sin(a), 230 + 120 * Math.sin(a * 2)];
-  if (path === 5) return [cx + 150 * Math.sin(a * 2) * Math.cos(a), 230 + 130 * Math.sin(a * 2) * Math.sin(a)];
-  if (path === 6) return [cx + 150 * Math.sin(a * 3), 60 + 320 * u];
-  return [cx + 160 * Math.sin(a), 230 - 135 * Math.cos(a)];
+  const a = u * Math.PI, shape = path >> 1;
+  let x, y;
+  if (shape === 0) { x = -20 + 400 * u; y = 70 + 230 * Math.sin(a) + 40 * Math.sin(a * 4); }                         // a long dip across with a ripple in it
+  else if (shape === 1) { x = -20 + 400 * u + 70 * Math.sin(a * 4); y = 96 + 60 * u + 70 * (1 - Math.cos(a * 4)); }    // across in two loops
+  else if (shape === 2) { x = W / 2 - 150 * Math.cos(a); y = -20 + 380 * Math.sin(a); }                               // down one side, along the bottom, up the other
+  else {                                                                                                             // a spiral in from the side, then out over the top
+    const r = 200 - 150 * u, t = Math.PI * (1 + 2.5 * u);
+    x = W / 2 + r * Math.cos(t); y = 150 + (120 - 60 * u) * Math.sin(t) - 1300 * Math.max(0, u - 0.8);
+  }
+  return [path % 2 ? W - x : x, y];
 }
 function enterRealm() {
   const P = S.player;
@@ -1549,13 +1563,14 @@ function enterRealm() {
 }
 function leaveRealm() {
   const R = S.realm, P = S.player, all = REALM.squads * REALM.per, perfect = R.killed === all;
-  if (perfect) { S.cents += REALM.perfect; S.stats.earned += REALM.perfect; R.cents += REALM.perfect; }
+  // A clean sweep pays double: the whole take again on top.
+  if (perfect) { const again = R.cents; S.cents += again; S.stats.earned += again; R.cents += again; }
   // Back where you left from, with a moment's grace before anything can touch you.
   P.x = R.x; P.y = R.y; input.target = clamp(P.x, edgeX(), W - edgeX()); input.targetY = P.y; P.inv = Math.max(P.inv, 2);
   S.bullets = []; S.realm = null;
   // The boss waits long enough for the result to be read before his own banner takes its place.
   if (S.nextWave <= 0) S.nextWave = 2.8;
-  banner(perfect ? "Perfect trip" : "Back from the realm", `${R.killed} of ${all} machine elves and friends. ${R.cents ? "+" + money(R.cents) : "They got away with it"}${perfect ? ", bonus included" : ""}.`, C.lime);
+  banner(perfect ? "Perfect trip" : "Back from the realm", `${R.killed} of ${all} machine elves and friends. ${R.cents ? "+" + money(R.cents) : "They got away with it"}${perfect ? ", doubled for getting them all" : ""}.`, C.lime);
   sfx.power();
 }
 function updateRealm(dt) {
@@ -1994,8 +2009,8 @@ function update(dt) {
     else {
       S.nextWave -= dt;
       if (S.nextWave <= 0) {
-        // The challenge stage comes once when wave 2, 6, 10 and so on is cleared: one in every four.
-        if (S.wave % 4 === 2 && S.dmtWave !== S.wave) { S.dmtWave = S.wave; enterRealm(); }
+        // The challenge stage comes once when wave 2, 8, 14 and so on is cleared: one in every six.
+        if (S.wave % 6 === 2 && S.dmtWave !== S.wave) { S.dmtWave = S.wave; enterRealm(); }
         else {
           S.wave++;
           if (S.wave % 3 === 0) spawnBoss();
@@ -2217,21 +2232,19 @@ function drawMandala(g, x, y, r, t, alpha) {
   }
   g.restore(); g.globalAlpha = 1;
 }
-// ---------- the realm's backdrop, after the picture Jeremy sent ----------
-// A patterned sky, white sacred-geometry lines, rainbow beams, and in the middle of it a horned thing with too many eyes
-// holding a light in its chest (the light is the door the elves come out of). Everything mirrors left to right.
-// It is painted once per trip onto its own canvas, in colours that turn with each trip; what moves is drawn over it every frame.
+// ---------- the realm's backdrops: each trip goes somewhere different (as ordered by Jeremy) ----------
+// There are three places. A trip's backdrop is painted once onto its own canvas, in colours that turn with every trip,
+// and what moves is drawn over it every frame. All three are dimmed at the top and bottom so the game still reads.
 const ORB = [W / 2, 230];
-function paintBackdrop(g, turn) {
-  const hues = [C.violet, C.mint, C.pink, C.cyan, C.gold, C.orange, C.lime, C.blue];
-  const hue = (i) => hues[(Math.round(i) + turn * 3) % 8];
-  const [cx, oy] = ORB;
-  const poly = (x, y, r, n, rot) => {
-    g.beginPath();
-    for (let k = 0; k < n; k++) { const a = rot + (k / n) * TAU; if (k) g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); else g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
-    g.closePath();
-  };
-  g.lineCap = "round"; g.lineJoin = "round";
+function ngon(g, x, y, r, n, rot) {
+  g.beginPath();
+  for (let k = 0; k < n; k++) { const a = rot + (k / n) * TAU; if (k) g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); else g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+  g.closePath();
+}
+// The first place, after the picture Jeremy sent: a patterned sky, white sacred-geometry lines, rainbow beams, and in the
+// middle of it a horned thing with too many eyes holding a light in its chest. Everything mirrors left to right.
+function sceneEntity(g, hue) {
+  const [cx, oy] = ORB, poly = (x, y, r, n, rot) => ngon(g, x, y, r, n, rot);
   const sky = g.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, C.plum); sky.addColorStop(0.6, C.deep); sky.addColorStop(1, C.void);
   g.fillStyle = sky; g.fillRect(-12, -12, W + 24, H + 24);
@@ -2317,6 +2330,69 @@ function paintBackdrop(g, turn) {
   g.fillStyle = C.ink; for (let i = -3; i <= 3; i++) g.fillRect(cx + i * 5 - 1.2, 199 + (9 - i * i) * 0.4, 2.4, 3.4);
   // The light in its chest.
   for (let r = 64; r > 6; r -= 6) { g.globalAlpha = 0.08; g.fillStyle = r > 34 ? C.violet : C.ink; g.beginPath(); g.arc(cx, oy, r, 0, TAU); g.fill(); }
+  g.globalAlpha = 1;
+}
+// The second place: one enormous eye. Ripples run out from it across the sky, its lashes are rays of two lengths,
+// its iris is rings of colour, and a ring of small eyes all look in at it. Its pupil is drawn every frame, because it follows the ship.
+function sceneEye(g, hue) {
+  const [cx, oy] = ORB;
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, C.navy); sky.addColorStop(0.55, C.deep); sky.addColorStop(1, C.void);
+  g.fillStyle = sky; g.fillRect(-12, -12, W + 24, H + 24);
+  g.lineWidth = 1.5;
+  for (let r = 40; r < 520; r += 22) { g.globalAlpha = 0.24; g.strokeStyle = hue(r / 22); g.beginPath(); g.ellipse(cx, oy, r, r * 0.8, 0, 0, TAU); g.stroke(); }
+  for (let k = 0; k < 36; k++) {
+    const a = (k / 36) * TAU, far = k % 2 ? 150 : 178;
+    g.globalAlpha = 0.6; g.strokeStyle = hue(k); g.lineWidth = 3;
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * 120, oy + Math.sin(a) * 76); g.lineTo(cx + Math.cos(a) * far, oy + Math.sin(a) * far * 0.63); g.stroke();
+  }
+  g.globalAlpha = 0.92; g.fillStyle = C.ink;
+  g.beginPath(); g.moveTo(cx - 116, oy); g.quadraticCurveTo(cx, oy - 120, cx + 116, oy); g.quadraticCurveTo(cx, oy + 120, cx - 116, oy); g.closePath(); g.fill();
+  g.globalAlpha = 1; g.strokeStyle = hue(2); g.lineWidth = 3; g.stroke();
+  for (let i = 0; i < 7; i++) { g.fillStyle = hue(i + 1); g.beginPath(); g.arc(cx, oy, 58 - i * 6, 0, TAU); g.fill(); }
+  g.strokeStyle = C.void; g.globalAlpha = 0.35; g.lineWidth = 1.2;
+  for (let k = 0; k < 24; k++) { const a = (k / 24) * TAU; g.beginPath(); g.moveTo(cx + Math.cos(a) * 20, oy + Math.sin(a) * 20); g.lineTo(cx + Math.cos(a) * 58, oy + Math.sin(a) * 58); g.stroke(); }
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * TAU + 0.3, ex = cx + Math.cos(a) * 150, ey = oy + Math.sin(a) * 190;
+    g.globalAlpha = 0.9; g.fillStyle = C.ink; g.beginPath(); g.ellipse(ex, ey, 13, 8, a + Math.PI / 2, 0, TAU); g.fill();
+    g.fillStyle = hue(k + 3); g.beginPath(); g.arc(ex - Math.cos(a) * 3, ey - Math.sin(a) * 3, 5, 0, TAU); g.fill();
+    g.fillStyle = C.void; g.beginPath(); g.arc(ex - Math.cos(a) * 4, ey - Math.sin(a) * 4, 2.2, 0, TAU); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+// The third place: a plain of glowing tiles running off to a horizon, a banded sun, two moons, a few shapes adrift,
+// and a pyramid that looks back. Its eye is drawn every frame too.
+function scenePlane(g, hue) {
+  const cx = W / 2, far = 250;
+  const sky = g.createLinearGradient(0, 0, 0, far);
+  sky.addColorStop(0, C.void); sky.addColorStop(1, C.plum);
+  g.fillStyle = sky; g.fillRect(-12, -12, W + 24, far + 12);
+  g.fillStyle = C.deep; g.fillRect(-12, far, W + 24, H - far + 12);
+  g.globalAlpha = 0.9; g.fillStyle = hue(4); g.beginPath(); g.arc(70, 124, 30, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(83, 116, 26, 0, TAU); g.fill();
+  g.fillStyle = hue(1); g.beginPath(); g.arc(304, 150, 15, 0, TAU); g.fill();
+  for (let i = 0; i < 7; i++) { g.globalAlpha = 0.75; g.fillStyle = hue(i); g.beginPath(); g.arc(cx, far, 122 - i * 14, Math.PI, 0); g.closePath(); g.fill(); }
+  g.lineWidth = 1.2;
+  for (let k = -12; k <= 12; k++) { g.globalAlpha = 0.45; g.strokeStyle = hue(k + 12); g.beginPath(); g.moveTo(cx, far); g.lineTo(cx + k * 60, H + 12); g.stroke(); }
+  for (let i = 1; i <= 12; i++) { const y = far + (H - far) * (i / 12) ** 2; g.globalAlpha = 0.4; g.strokeStyle = hue(i + 3); g.beginPath(); g.moveTo(-12, y); g.lineTo(W + 12, y); g.stroke(); }
+  const base = far + 6, side = () => { g.beginPath(); g.moveTo(cx, 124); g.lineTo(cx + 96, base); g.lineTo(cx - 96, base); g.closePath(); };
+  g.globalAlpha = 0.96; g.fillStyle = C.navy; side(); g.fill();
+  g.globalAlpha = 0.35; g.fillStyle = hue(5); g.beginPath(); g.moveTo(cx, 124); g.lineTo(cx + 96, base); g.lineTo(cx + 10, base); g.closePath(); g.fill();
+  g.globalAlpha = 0.9; g.strokeStyle = hue(2); g.lineWidth = 2; side(); g.stroke();
+  for (let i = 1; i < 6; i++) { const y = 124 + i * 22, hw = (y - 124) * 96 / (base - 124); g.globalAlpha = 0.35; g.strokeStyle = hue(i); g.lineWidth = 1; g.beginPath(); g.moveTo(cx - hw, y); g.lineTo(cx + hw, y); g.stroke(); }
+  g.globalAlpha = 1; g.fillStyle = C.ink; g.beginPath(); g.ellipse(cx, ORB[1] - 22, 26, 15, 0, 0, TAU); g.fill();
+  g.strokeStyle = hue(6); g.lineWidth = 2; g.stroke();
+  [[52, 300, 16, 3], [316, 330, 20, 4], [36, 210, 10, 5], [330, 76, 12, 6], [246, 90, 8, 3]].forEach(([x, y, r, n], i) => {
+    g.globalAlpha = 0.6; g.strokeStyle = hue(i * 2); g.lineWidth = 2; ngon(g, x, y, r, n, i); g.stroke();
+  });
+  g.globalAlpha = 1;
+}
+const SCENES = [sceneEntity, sceneEye, scenePlane];
+function paintBackdrop(g, turn) {
+  const hues = [C.violet, C.mint, C.pink, C.cyan, C.gold, C.orange, C.lime, C.blue];
+  const hue = (i) => hues[(((Math.round(i) + turn * 3) % 8) + 8) % 8];
+  g.lineCap = "round"; g.lineJoin = "round";
+  SCENES[turn % SCENES.length](g, hue);
   // Dimmed a little all over, and more at the top (the status bar) and the bottom (where the ship flies), so the game still reads.
   g.fillStyle = C.void;
   g.globalAlpha = 0.2; g.fillRect(-12, -12, W + 24, H + 24);
@@ -2349,22 +2425,36 @@ function drawRealm(g) {
     g.restore();
     return;
   }
-  // Inside: the painted backdrop, and over it the parts that move. A slow star turns round the light,
-  // the light breathes, and the two big eyes follow the ship.
-  const [ox, oy] = ORB, spin = reduced ? 0 : t * 0.25, beat = reduced ? 0 : Math.sin(t * 3);
+  // Inside: the painted backdrop, and over it the parts that move, which depend on where this trip went.
+  const [ox, oy] = ORB, scene = R.turn % SCENES.length, spin = reduced ? 0 : t * 0.25, beat = reduced ? 0 : Math.sin(t * 3);
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(realmBackdrop(R.turn), 0, 0); g.restore();
-  g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = 0.4;
-  for (const rot of [spin, spin + Math.PI]) {
-    g.beginPath();
-    for (let k = 0; k < 3; k++) { const a = rot + (k / 3) * TAU; if (k) g.lineTo(ox + Math.cos(a) * 118, oy + Math.sin(a) * 118); else g.moveTo(ox + Math.cos(a) * 118, oy + Math.sin(a) * 118); }
-    g.closePath(); g.stroke();
-  }
-  g.globalAlpha = 0.55 + 0.2 * beat; g.fillStyle = C.ink; g.beginPath(); g.arc(ox, oy, 15 + 3 * beat, 0, TAU); g.fill();
-  g.globalAlpha = 1;
-  const look = clamp((P.x - ox) / 60, -1, 1) * 3.5;
-  for (const side of [-1, 1]) {
-    g.fillStyle = C.orange; g.beginPath(); g.arc(ox + side * 21 + look, 151, 5, 0, TAU); g.fill();
-    g.fillStyle = C.void; g.beginPath(); g.arc(ox + side * 21 + look, 151, 2.2, 0, TAU); g.fill();
+  if (scene === 0) {
+    // A slow star turns round the light, the light breathes, and the two big eyes follow the ship.
+    g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = 0.4;
+    for (const rot of [spin, spin + Math.PI]) { ngon(g, ox, oy, 118, 3, rot); g.stroke(); }
+    g.globalAlpha = 0.55 + 0.2 * beat; g.fillStyle = C.ink; g.beginPath(); g.arc(ox, oy, 15 + 3 * beat, 0, TAU); g.fill();
+    g.globalAlpha = 1;
+    const look = clamp((P.x - ox) / 60, -1, 1) * 3.5;
+    for (const side of [-1, 1]) {
+      g.fillStyle = C.orange; g.beginPath(); g.arc(ox + side * 21 + look, 151, 5, 0, TAU); g.fill();
+      g.fillStyle = C.void; g.beginPath(); g.arc(ox + side * 21 + look, 151, 2.2, 0, TAU); g.fill();
+    }
+  } else if (scene === 1) {
+    // The one big eye watches the ship: its pupil slides toward wherever you are, and narrows on the beat.
+    const px = ox + clamp((P.x - ox) / 110, -1, 1) * 22, py = oy + 10;
+    g.fillStyle = C.void; g.beginPath(); g.ellipse(px, py, 15 - 3 * beat, 19, 0, 0, TAU); g.fill();
+    g.globalAlpha = 0.9; g.fillStyle = C.ink; g.beginPath(); g.arc(px - 6, py - 8, 4, 0, TAU); g.fill();
+    g.globalAlpha = 1;
+  } else {
+    // The pyramid's eye follows the ship, and now and then it blinks.
+    const ey = oy - 22, px = ox + clamp((P.x - ox) / 110, -1, 1) * 13;
+    if (!reduced && t % 5 > 4.82) {
+      g.fillStyle = C.navy; g.beginPath(); g.ellipse(ox, ey, 27, 16, 0, 0, TAU); g.fill();
+      g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(ox - 24, ey); g.lineTo(ox + 24, ey); g.stroke();
+    } else {
+      g.fillStyle = C.orange; g.beginPath(); g.arc(px, ey + 1, 10, 0, TAU); g.fill();
+      g.fillStyle = C.void; g.beginPath(); g.arc(px, ey + 2, 4.5, 0, TAU); g.fill();
+    }
   }
   for (const e of R.elves) drawTripper(g, e.x, e.y, t, e.hue, TRIP[e.path], 1 + (e.hue % 5 ? 0 : 0.6) + (reduced ? 0 : 0.25 * Math.sin(t * 5 + e.hue)));
   for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + (reduced ? 0 : t * 8))) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
