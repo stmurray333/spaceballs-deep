@@ -236,7 +236,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v4</span>
+  <span id="ver">v5</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
@@ -269,9 +269,18 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+// Saved settings used to live under the game's first name. Carry them over once, then drop the old keys.
+try {
+  for (const k of ["muted", "best", "name"]) {
+    const old = localStorage.getItem("mg-" + k);
+    if (old === null) continue;
+    if (localStorage.getItem("sd-" + k) === null) localStorage.setItem("sd-" + k, old);
+    localStorage.removeItem("mg-" + k);
+  }
+} catch {}
 
 // ---------- sound ----------
-let actx = null, noiseBuf = null, muted = store.get("mg-muted", false);
+let actx = null, noiseBuf = null, muted = store.get("sd-muted", false);
 function ensureAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; } }
   if (actx && actx.state === "suspended") actx.resume().catch(() => {});
@@ -1429,7 +1438,7 @@ function rankFor(c) {
   if (c < 0) return "Broke and tapped out";
   if (c < 5000) return "Green bubble energy";
   if (c < 20000) return "Weekend warrior";
-  if (c < 50000) return "Certified manly";
+  if (c < 50000) return "Certified baller";
   if (c < 100000) return "High roller";
   return "Kingpin of the galaxy";
 }
@@ -1458,9 +1467,9 @@ function showOver() {
     const dd = document.createElement("dd"); dd.textContent = String(v);
     return [dt, dd];
   }));
-  const best = store.get("mg-best", null);
+  const best = store.get("sd-best", null);
   const isBest = best === null || c > best;
-  if (isBest) store.set("mg-best", c);
+  if (isBest) store.set("sd-best", c);
   $("best").textContent = isBest ? "New personal best" : `Your best: ${money(best)}`;
   lastRun = { s: clamp(c, -100000, 10000000), w: S.wave };
   posted = null; postBtn.disabled = false; postStatus.textContent = "";
@@ -1485,7 +1494,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "1036071563957",
   appId: "1:1036071563957:web:6ec2d500bf755a844e84fc",
 };
-const BOARD = "manlyGalaxy";
+const BOARD = "spaceballsDeep";
 const nameInput = $("nameInput"), postBtn = $("postBtn"), postStatus = $("postStatus");
 let dbPromise = null, lastRun = null, posted = null, boardFrom = "title";
 
@@ -1501,7 +1510,7 @@ function getDb() {
     dbPromise = (async () => {
       if (!window.firebase) await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
       if (!firebase.firestore) await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
-      const app = firebase.apps.find((a) => a.name === "manly-galaxy") || firebase.initializeApp(FIREBASE_CONFIG, "manly-galaxy");
+      const app = firebase.apps.find((a) => a.name === "spaceballs-deep") || firebase.initializeApp(FIREBASE_CONFIG, "spaceballs-deep");
       return app.firestore();
     })();
     dbPromise.catch(() => { dbPromise = null; });
@@ -1545,13 +1554,13 @@ $("titleBoard").addEventListener("click", () => openBoard("title"));
 $("overBoard").addEventListener("click", () => openBoard("over"));
 $("boardBack").addEventListener("click", () => { $("board").hidden = true; $(boardFrom).hidden = false; });
 
-nameInput.value = store.get("mg-name", "");
+nameInput.value = store.get("sd-name", "");
 $("postForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = nameInput.value.trim().replace(/\s+/g, " ").slice(0, 16);
   if (!name) { postStatus.textContent = "Type a name first."; nameInput.focus(); return; }
   if (!lastRun || posted) return;
-  store.set("mg-name", name);
+  store.set("sd-name", name);
   postBtn.disabled = true; postStatus.textContent = "Posting...";
   try {
     const db = await getDb();
@@ -1605,7 +1614,7 @@ $("play").addEventListener("click", start);
 $("again").addEventListener("click", start);
 const muteBtn = $("mute");
 function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
-muteBtn.addEventListener("click", () => { muted = !muted; store.set("mg-muted", muted); syncMute(); ensureAudio(); muteBtn.blur(); });
+muteBtn.addEventListener("click", () => { muted = !muted; store.set("sd-muted", muted); syncMute(); ensureAudio(); muteBtn.blur(); });
 syncMute();
 
 // ---------- loop ----------
