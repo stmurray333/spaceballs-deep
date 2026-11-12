@@ -217,13 +217,13 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <div class="legend">
       <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Bugs</b><span>$1 to $5 a pop</span></div></div>
       <div class="item"><canvas data-icon="candy" aria-hidden="true"></canvas><div><b>Nose candy</b><span>Turbo, then a crash</span></div></div>
-      <div class="item"><canvas data-icon="choker" aria-hidden="true"></canvas><div><b>Choker</b><span>Beam taps you out</span></div></div>
+      <div class="item"><canvas data-icon="choker" aria-hidden="true"></canvas><div><b>Choker</b><span>Steals your ship</span></div></div>
       <div class="item"><canvas data-icon="card" aria-hidden="true"></canvas><div><b>Escort</b><span>Wingwoman. $1/sec</span></div></div>
       <div class="item"><canvas data-icon="rooster" aria-hidden="true"></canvas><div><b>Huge cock</b><span>$10. It's a rooster</span></div></div>
       <div class="item"><canvas data-icon="cody" aria-hidden="true"></canvas><div><b>Navy SEAL Cody</b><span>+1 life</span></div></div>
       <div class="item"><canvas data-icon="tit" aria-hidden="true"></canvas><div><b>Great tits</b><span>$3. They're birds</span></div></div>
       <div class="item"><canvas data-icon="bertha" aria-hidden="true"></canvas><div><b>Bosses</b><span>One every 3 waves</span></div></div>
-      <div class="item"><canvas data-icon="beer" aria-hidden="true"></canvas><div><b>Booze</b><span>More pay, worse aim</span></div></div>
+      <div class="item"><canvas data-icon="beer" aria-hidden="true"></canvas><div><b>Booze</b><span>More pay and power</span></div></div>
       <div class="item"><canvas data-icon="cop" aria-hidden="true"></canvas><div><b>DUI checkpoint</b><span>Dodge the light</span></div></div>
       <div class="item"><canvas data-icon="rubber" aria-hidden="true"></canvas><div><b>Rubber</b><span>Blocks her STDs</span></div></div>
       <div class="item"><canvas data-icon="clinic" aria-hidden="true"></canvas><div><b>Free clinic</b><span>Cure. $20 co-pay</span></div></div>
@@ -276,7 +276,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v12</span>
+  <span id="ver">v13</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -898,7 +898,7 @@ function newState() {
     mode: "play", t: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -908,7 +908,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0,
     },
   };
 }
@@ -1029,13 +1029,13 @@ function updateFlyers(dt) {
     if (f.vx > 0 ? f.x > W + 60 : f.x < -60) f.dead = true;
   }
 }
-function hitFlyer(f) {
+function hitFlyer(f, dmg = 1) {
   if (f.kind === "cop") {
     sfx.tink();
     if (!f.shotAt) { f.shotAt = true; pop("Bulletproof. Nice try.", f.x, f.y - 30, C.cyan, 16); }
     return;
   }
-  f.hp--; f.flash = 0.08;
+  f.hp -= dmg; f.flash = 0.08;
   if (f.hp > 0) { sfx.tink(); return; }
   f.dead = true;
   if (f.kind === "keg") {
@@ -1137,11 +1137,11 @@ function updateBoss(dt) {
     B.atkCd = (B.hp < B.maxHp / 2 ? 1.7 : 2.2) - Math.min(0.5, (S.bossCount - 1) * 0.15);
   }
 }
-function hitBoss(B) {
-  B.hp--; B.flash = 0.06;
+function hitBoss(B, dmg = 1) {
+  B.hp -= dmg; B.flash = 0.06;
   if (B.hp > 0) {
     if (!B.balls && B.hp < B.maxHp / 2) { B.balls = 1; dropEightBall(B); }
-    if (B.hp % 3 === 0) sfx.tink();
+    if (Math.floor(B.hp) % 3 === 0) sfx.tink();
     return;
   }
   B.state = "dying"; B.dieT = 1.4;
@@ -1188,8 +1188,8 @@ function shotHit(e) {
   }[k] || ["Shot down", pick(SHOT_LINES)];
   hurt(line[0], line[1]);
 }
-function hitBug(b) {
-  b.hp--; b.flash = 0.08;
+function hitBug(b, dmg = 1) {
+  b.hp -= dmg; b.flash = 0.08;
   if (b.hp > 0) { sfx.tink(); return; }
   b.dead = true;
   if (S.beamer === b) S.beamer = null;
@@ -1216,7 +1216,8 @@ function collect(kind) {
   if (kind === "candy") {
     S.stats.bags++; S.turbo = Math.min(12, S.turbo + 6); S.crash = 0;
     pop("*SNIFF*", P.x, P.y - 30, C.ink, 20); sfx.sniff();
-    if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
+    S.hot = false; S.heat = 0;
+    if (S.drinks > 2) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
   } else if (kind === "card") {
     if (S.escort && S.escort.free) { pop("You've already got the hot one", P.x, P.y - 34, C.gold, 15); return; }
     if (S.cents <= 0) { pop("She saw your bank account", P.x, P.y - 34, C.pink, 15); return; }
@@ -1237,7 +1238,8 @@ function collect(kind) {
   } else if (kind === "eightball") {
     S.stats.eightballs++; S.tweak = Math.min(16, S.tweak + 8); S.crash = 0;
     pop("*8-BALL*", P.x, P.y - 30, C.cyan, 20); sfx.sniff();
-    if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
+    S.hot = false; S.heat = 0;
+    if (S.drinks > 2) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
   } else {
     S.lives++; S.stats.cody++;
@@ -1248,6 +1250,13 @@ function hurt(title, sub) {
   const P = S.player;
   if (P.inv > 0 || S.mode !== "play") return;
   S.stats.hitsBy[title] = (S.stats.hitsBy[title] || 0) + 1; S.stats.lastHit = title;
+  // A Super Honcho's spare ship takes the hit instead of a life.
+  if (S.dual) {
+    S.dual = false; P.inv = 2.2; S.shake = 0.5;
+    burst(P.x + 11, P.y, C.gold, 26); sfx.hurt();
+    banner("Honcho down", `${title}. The spare took it for you.`, C.red);
+    return;
+  }
   S.lives--; P.inv = 2.2; S.shake = 0.5;
   burst(P.x, P.y, C.gold, 26); sfx.hurt();
   banner(title, sub, C.red);
@@ -1263,10 +1272,15 @@ const STD = {
 };
 const drunkLevel = () => Math.min(3, Math.ceil(S.drinks));
 const payMult = () => 1 + 0.5 * drunkLevel();
+// Liquid courage hits harder too: a shot does as much extra damage as a bug pays extra.
+const punch = () => payMult();
 // Nose candy and the 8-ball sober the ship up for as long as they last: no sway, no stray shots, no double vision.
 // The drinks are still in there, so the pay bonus, the breathalyser and the blackout all carry on as before.
 const wired = () => S.turbo > 0 || S.tweak > 0;
 const sloppy = () => (wired() ? 0 : Math.min(S.drinks, 4));
+// Jeremy's key bump: a sniff with three or more beers on board stops the world for a beat and says so.
+const BUMP = 0.75;
+function keyBump() { S.bump = BUMP; S.stats.bumps++; sfx.power(); }
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
 // Rounded up, because a drink starts wearing off the moment it lands and two quick beers should still blow .08.
 const bac = () => Math.ceil(S.drinks * 4 - 1e-6);
@@ -1282,8 +1296,8 @@ function drink() {
   const P = S.player;
   S.stats.beers++; S.drinks += 1; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
   S.stats.peakBac = Math.max(S.stats.peakBac, bac());
-  pop(`*GLUG* pay x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
-  if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more when you're drunk. Your aim does not improve.", C.gold); }
+  pop(`*GLUG* pay and power x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
+  if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more and your shots hit harder when you're drunk. Your aim does not improve.", C.gold); }
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
   if (S.drinks > 4) { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
 }
@@ -1395,7 +1409,8 @@ function updatePlayer(dt) {
   let target = input.dragging ? input.target + wob : gyro.on ? gyroTarget() + wob : P.x + dw;
   if (input.left) target = -1e4;
   if (input.right) target = 1e4;
-  P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), 16, W - 16);
+  const edge = S.dual ? 27 : 16;
+  P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), edge, W - edge);
   if (!input.dragging) input.target = P.x;
   let targetY = input.dragging ? input.targetY : P.y;
   if (input.up) targetY = -1e4;
@@ -1413,8 +1428,9 @@ function updatePlayer(dt) {
   if (firing && S.fireCd <= 0) {
     // On an 8-ball the ship fires three at a time.
     const lanes = S.tweak > 0 ? [-55, 0, 55] : [0], spread = 22 * sloppy();
-    for (const vx of lanes) S.bullets.push({ x: P.x, y: P.y - 18, vy: -540, vx: vx + rand(-1, 1) * spread });
-    S.shots += lanes.length;
+    const guns = S.dual ? [-11, 11] : [0];
+    for (const vx of lanes) for (const gx of guns) S.bullets.push({ x: P.x + gx, y: P.y - 18, vy: -540, vx: vx + rand(-1, 1) * spread });
+    S.shots += lanes.length * guns.length;
     S.fireCd = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1) * (S.tweak > 0 ? 0.5 : 1);
     sfx.shoot();
     // Nose candy and the 8-ball are too wired to overheat: no heat builds while either is running.
@@ -1432,6 +1448,7 @@ function updateBugs(dt) {
   for (const b of S.bugs) {
     b.warn = false;
     b.flash = Math.max(0, b.flash - dt);
+    if (b.captive) b.captive.t = Math.min(1, b.captive.t + dt / 0.7);
     if (b.delay > 0) { b.delay -= dt; continue; }
     const sx = slotX(b), sy = slotY(b);
     if (b.state === "enter") {
@@ -1460,7 +1477,11 @@ function updateBugs(dt) {
           const hw = 8 + ((P.y - top) / (bot - top)) * 46;
           if (Math.abs(P.x - b.x) < hw - 4) {
             S.stats.chokes++;
-            hurt("Tapped out", "Rear naked choke. Nothing you could do.");
+            // As ordered by Jeremy: with a life to spare and nobody already holding one, he keeps the ship he just choked out.
+            // Shoot him and it comes back to fly beside you as a Super Honcho.
+            const keep = !S.dual && S.lives > 1 && !S.rescue && !S.bugs.some((o) => o.captive);
+            hurt("Tapped out", keep ? "He's dragging your ship off. Shoot him to win it back." : "Rear naked choke. Nothing you could do.");
+            if (keep) { b.captive = { t: 0, x: P.x, y: P.y }; S.stats.captured++; }
           }
         }
       }
@@ -1498,9 +1519,10 @@ function update(dt) {
   if (S.mode === "intro") {
     S.introT += dt;
     if (!S.introBoom && S.introT >= 1.5 && S.introT < INTRO) { S.introBoom = true; sfx.boom(); }
-    if (S.introT >= INTRO) { S.mode = "play"; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
+    if (S.introT >= INTRO) { S.mode = "play"; fireBtn.hidden = false; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
     return;
   }
+  if (S.bump > 0) { S.bump = Math.max(0, S.bump - dt); return; }
   S.t += dt;
   S.sway = Math.sin(S.t * 0.7) * 16;
   S.shake = Math.max(0, S.shake - dt);
@@ -1556,7 +1578,7 @@ function update(dt) {
     for (const b of S.bugs) {
       if (s.dead || b.dead || b.delay > 0) continue;
       const r = b.type === "choker" ? 15 : 12;
-      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; if (!s.heart) S.stats.hits++; hitBug(b); }
+      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; if (!s.heart) S.stats.hits++; hitBug(b, s.heart ? 1 : punch()); }
     }
     for (const f of S.flyers) {
       if (s.dead || f.dead) continue;
@@ -1564,19 +1586,20 @@ function update(dt) {
         : f.kind === "keg" ? Math.abs(s.x - f.x) < 16 && Math.abs(s.y - f.y) < 17
         : f.kind === "cop" ? Math.abs(s.x - f.x) < 27 && s.y > f.y - 20 && s.y < f.y + 12
         : Math.abs(s.x - f.x) < 12 && Math.abs(s.y - f.y) < 11;
-      if (hit) { s.dead = true; if (!s.heart) S.stats.hits++; hitFlyer(f); }
+      if (hit) { s.dead = true; if (!s.heart) S.stats.hits++; hitFlyer(f, s.heart ? 1 : punch()); }
     }
     const B = S.boss;
-    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B); }
+    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B, s.heart ? 1 : punch()); }
   }
 
   if (S.mode === "play") {
+    const wide = S.dual ? 11 : 0;
     for (const d of S.drops) {
-      if (Math.abs(d.x - P.x) < 18 && Math.abs(d.y - P.y) < 20) { d.dead = true; collect(d.kind); }
+      if (Math.abs(d.x - P.x) < 18 + wide && Math.abs(d.y - P.y) < 20) { d.dead = true; collect(d.kind); }
     }
     if (P.inv <= 0) {
       for (const e of S.ebullets) {
-        if (Math.abs(e.x - P.x) < (SHOT_HALF[e.kind] || 7) && Math.abs(e.y - P.y) < 12) {
+        if (Math.abs(e.x - P.x) < (SHOT_HALF[e.kind] || 7) + wide && Math.abs(e.y - P.y) < 12) {
           e.dead = true; shotHit(e);
           break;
         }
@@ -1584,7 +1607,7 @@ function update(dt) {
     }
     if (P.inv <= 0) {
       for (const b of S.bugs) {
-        if (b.state === "dive" && !b.dead && Math.abs(b.x - P.x) < 16 && Math.abs(b.y - P.y) < 16) {
+        if (b.state === "dive" && !b.dead && Math.abs(b.x - P.x) < 16 + wide && Math.abs(b.y - P.y) < 16) {
           b.dead = true; burst(b.x, b.y, C.pink, 12);
           hurt("Rammed", "A bug body-slammed you. Embarrassing.");
           break;
@@ -1593,6 +1616,21 @@ function update(dt) {
     }
   }
 
+  // However the choker holding your ship goes down, the ship comes loose and flies home to dock.
+  for (const b of S.bugs) {
+    if (!b.dead || !b.captive) continue;
+    S.rescue = { x: b.x, y: b.y - 22 };
+    pop("HONCHO'S LOOSE", b.x, b.y - 34, C.gold, 18); sfx.power();
+  }
+  const R = S.rescue;
+  if (R && S.mode === "play") {
+    const dx = P.x + 11 - R.x, dy = P.y - R.y, d = Math.hypot(dx, dy), go = 260 * dt;
+    if (d <= Math.max(go, 6)) {
+      S.rescue = null; S.dual = true; S.stats.rescued++;
+      burst(P.x, P.y, C.gold, 22);
+      banner("Super Honcho", "Two ships, twice the guns. The spare takes the next hit.", C.gold);
+    } else { R.x += (dx / d) * go; R.y += (dy / d) * go; }
+  }
   S.bugs = S.bugs.filter((b) => !b.dead);
   if (S.beamer && (S.beamer.dead || S.beamer.state !== "beamIn" && S.beamer.state !== "beam")) S.beamer = null;
   S.bullets = S.bullets.filter((s) => !s.dead && s.y > -20);
@@ -1721,17 +1759,55 @@ function drawBanner(g) {
   if (!b) return;
   g.globalAlpha = Math.max(0, Math.min(1, b.life / 0.4, (b.max - b.life) / 0.15));
   g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `19px ${FONT_HUD}`;
+  const subs = b.sub ? wrap(g, b.sub, 300) : [];
   g.font = `22px ${FONT_SIGN}`;
   const lines = wrap(g, b.title.toUpperCase(), 316);
-  let y = H * 0.6 - (lines.length - 1) * 13;
+  // Built upward from a floor just above the room the ship flies in, so a banner never lands on the ship.
+  let y = Y_MIN - 49 - subs.length * 19 - (lines.length - 1) * 26;
   g.shadowColor = b.color; g.shadowBlur = 14; g.fillStyle = b.color;
   for (const l of lines) { g.fillText(l, W / 2, y); y += 26; }
   g.shadowBlur = 0;
-  if (b.sub) {
-    g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink;
-    for (const l of wrap(g, b.sub, 300)) { g.fillText(l, W / 2, y + 2); y += 19; }
-  }
+  g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink;
+  for (const l of subs) { g.fillText(l, W / 2, y + 2); y += 19; }
   g.globalAlpha = 1;
+}
+// The key bump card: a key with a little pile on the end of it, as specified.
+function drawKey(g) {
+  g.save(); g.rotate(-0.6);
+  g.strokeStyle = C.gold; g.lineCap = "round";
+  g.lineWidth = 7; g.beginPath(); g.arc(-52, 0, 17, 0, TAU); g.stroke();
+  g.beginPath(); g.moveTo(-35, 0); g.lineTo(54, 0); g.stroke();
+  g.lineWidth = 6; g.beginPath(); g.moveTo(20, 0); g.lineTo(20, 13); g.moveTo(34, 0); g.lineTo(34, 9); g.stroke();
+  g.fillStyle = C.ink;
+  g.beginPath(); g.ellipse(52, -7, 14, 7, 0, 0, TAU); g.fill();
+  for (const [x, y, r] of [[38, -14, 2], [63, -14, 1.8], [54, -19, 2.2], [69, -4, 1.5], [45, 9, 1.4], [60, 10, 1.2]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+  g.restore();
+}
+function drawBump(g) {
+  const k = 1 - S.bump / BUMP, a = Math.min(1, k * 10, (1 - k) * 8);
+  g.save();
+  g.globalAlpha = 0.88 * a; g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
+  g.globalAlpha = a;
+  const z = reduced ? 1 : 1 + 0.3 * Math.max(0, 1 - k * 6);
+  g.translate(W / 2, H / 2 - 30); g.scale(z, z);
+  drawKey(g);
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `36px ${FONT_SIGN}`; g.shadowBlur = 18;
+  g.fillStyle = C.cyan; g.shadowColor = C.cyan; g.fillText("KEY BUMP", 0, 78);
+  g.fillStyle = C.pink; g.shadowColor = C.pink; g.fillText("ENGAGED", 0, 118);
+  g.shadowBlur = 0; g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink;
+  g.fillText("Sober as a judge. Paid like a drunk.", 0, 156);
+  g.restore();
+}
+// A ship the choker has taken: it spins up the beam, then rides on his back until somebody shoots him.
+function drawCaptive(g, b) {
+  const c = b.captive, t = ease(c.t), x = c.x + (b.x - c.x) * t, y = c.y + (b.y - 22 - c.y) * t;
+  g.save(); g.translate(x, y); g.rotate((1 - t) * TAU * 2); g.scale(0.7, 0.7);
+  g.globalAlpha = 0.85; drawPlayer(g, 0, 0, S.t, false);
+  g.globalAlpha = 1; g.strokeStyle = C.red; g.lineWidth = 2; g.setLineDash([4, 4]);
+  g.beginPath(); g.arc(0, 2, 22, 0, TAU); g.stroke(); g.setLineDash([]);
+  g.restore();
 }
 function render() {
   const k = dpr * scale;
@@ -1760,6 +1836,8 @@ function render() {
       ctx.fillStyle = Math.floor(S.t * 20) % 2 ? C.red : C.ink; ctx.fillText("!", b.x, b.y - 24);
     }
   }
+  for (const b of S.bugs) if (b.captive && b.delay <= 0) drawCaptive(ctx, b);
+  if (S.rescue) { ctx.save(); ctx.translate(S.rescue.x, S.rescue.y); ctx.rotate(reduced ? 0 : S.t * 9); drawPlayer(ctx, 0, 0, S.t, false); ctx.restore(); }
   if (S.boss) BOSSES[S.boss.key].draw(ctx, S.boss.x, S.boss.y, S.t, S.boss.flash > 0, S.boss.hp < S.boss.maxHp / 2);
   for (const f of S.flyers) {
     if (f.kind === "rooster") drawRooster(ctx, f.x, f.y, S.t, f.dir, f.flash > 0);
@@ -1775,9 +1853,9 @@ function render() {
   if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t, S.escort.free);
   const P = S.player;
   if (S.mode === "play" && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) {
-    drawPlayer(ctx, P.x, P.y, S.t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
+    for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(ctx, P.x + gx, P.y, S.t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
     if (S.hot || S.heat > 0.55) {
-      ctx.globalAlpha = S.hot ? 0.55 + 0.45 * Math.sin(S.t * 20) : (S.heat - 0.55) * 2.2;
+      ctx.globalAlpha = S.hot ? (reduced ? 0.9 : 0.55 + 0.45 * Math.sin(S.t * 20)) : (S.heat - 0.55) * 2.2;
       ctx.strokeStyle = C.red; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(P.x, P.y - 13, 12, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
       ctx.globalAlpha = 1;
@@ -1829,6 +1907,7 @@ function render() {
       ctx.fillStyle = C.pink; ctx.fillText("BLACKOUT", W / 2, H / 2);
       ctx.globalAlpha = 1;
     }
+    if (S.bump > 0) drawBump(ctx);
   }
 }
 
@@ -1930,6 +2009,8 @@ function buildSheet(c) {
       ["Cocks / tits", `${st.cocks} / ${st.tits}`],
       ["Bosses beaten", st.bosses],
       ["Choked out", st.chokes],
+      ["Ships stolen / won back", `${st.captured} / ${st.rescued}`],
+      ["Key bumps", st.bumps],
       ["Navy SEAL rescues", st.cody],
       ["Hits taken", tally(st.hitsBy) || "None"],
       ["Finished off by", st.lastHit || "Nothing"],
@@ -1994,7 +2075,7 @@ function start() {
   else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
-  fireOn = true; syncFire(); fireBtn.hidden = false; $("ver").hidden = true;
+  fireOn = true; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
   if (gyro.wanted && !gyro.on && TILT_OK) setGyro(true);
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
@@ -2098,34 +2179,52 @@ const toXY = (e) => {
   const r = cv.getBoundingClientRect();
   return [((e.clientX - r.left) / r.width) * W, typeof e.clientY === "number" ? ((e.clientY - r.top) / r.height) * H : input.lastFy];
 };
+// Every finger that is down on the game, and where it last was. One of them steers; if it lifts, another takes over.
+const fingers = new Map();
 let steerId = null;
+const idOf = (e) => (e && e.pointerId !== undefined ? e.pointerId : steerId === null ? 0 : steerId);
+const steerWith = (id) => { steerId = id; [input.lastFx, input.lastFy] = fingers.get(id); };
 // Touches count anywhere on the page, not just on the game, so the thumb can work from the pad underneath.
 document.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" && !touched) { touched = true; relayout(); }
   if (e.target && e.target.closest && e.target.closest("button, input, a")) return;
+  // Right-clicks and Ctrl-clicks open a menu that swallows the release, so they never start a drag.
+  if (e.button > 0 || (e.ctrlKey && e.pointerType === "mouse")) return;
   // The tap that skips the intro also starts the drag, so a finger left on the glass flies and fires straight away.
   if (S && S.mode === "intro") S.introT = INTRO;
   else if (!S || S.mode !== "play") return;
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
-  // One finger steers; a second one landing changes nothing.
+  // The mouse, or the first finger of a touch, means nothing else can still be down: forget anything left over.
+  if (e.isPrimary !== false) { fingers.clear(); input.dragging = false; }
+  const id = e.pointerId === undefined ? 0 : e.pointerId;
+  fingers.set(id, toXY(e));
   if (input.dragging) return;
-  steerId = e.pointerId === undefined ? null : e.pointerId;
-  [input.lastFx, input.lastFy] = toXY(e);
+  steerWith(id);
   // The ship already sits at its anchor plus the drunk sway, so anchor the drag without the sway or it counts twice.
   input.dragging = true; input.touchFire = true;
   input.target = clamp(S.player.x - S.player.wob, 16, W - 16); input.targetY = S.player.y;
 });
-const mine = (e) => !e || e.pointerId === undefined || steerId === null || e.pointerId === steerId;
 document.addEventListener("pointermove", (e) => {
-  if (!input.dragging || !mine(e)) return;
+  const id = idOf(e);
+  if (!fingers.has(id)) return;
   const [x, y] = toXY(e);
+  fingers.set(id, [x, y]);
+  if (!input.dragging || id !== steerId) return;
   input.target = clamp(input.target + (x - input.lastFx) * 1.3, 16, W - 16);
   input.targetY = clamp(input.targetY + (y - input.lastFy) * 1.3, Y_MIN, Y_MAX);
   input.lastFx = x; input.lastFy = y;
 });
-const release = (e) => { if (!mine(e)) return; input.dragging = false; input.touchFire = false; steerId = null; };
+// Called with no event (the page lost focus or was hidden), every finger is let go at once.
+const release = (e) => {
+  const id = idOf(e);
+  if (e) fingers.delete(id); else fingers.clear();
+  if (e && steerId !== null && id !== steerId) return;
+  const next = fingers.keys().next();
+  if (input.dragging && !next.done) { steerWith(next.value); return; }
+  input.dragging = false; input.touchFire = false; steerId = null;
+};
 document.addEventListener("pointerup", release);
 document.addEventListener("pointercancel", release);
 cv.addEventListener("lostpointercapture", release);
@@ -2138,7 +2237,7 @@ addEventListener("keydown", (e) => {
   if (UP.includes(e.code)) { input.up = true; e.preventDefault(); }
   if (DOWN.includes(e.code)) { input.down = true; e.preventDefault(); }
   if (FIRE.includes(e.code)) { input.keyFire = true; e.preventDefault(); }
-  if (e.code === "KeyF" && !e.repeat) toggleFire();
+  if (e.code === "KeyF" && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) toggleFire();
 });
 addEventListener("keyup", (e) => {
   if (LEFT.includes(e.code)) input.left = false;
