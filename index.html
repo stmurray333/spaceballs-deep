@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v21</span>
+  <span id="ver">v22</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -342,7 +342,8 @@ try {
 let actx = null, noiseBuf = null, muted = store.get("sd-muted", false);
 function ensureAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; } }
-  if (actx && actx.state === "suspended") actx.resume().catch(() => {});
+  // An iPhone can leave the audio "interrupted" after a call or a trip to another app, so anything short of running gets a resume.
+  if (actx && actx.state !== "running" && actx.state !== "closed") actx.resume().catch(() => {});
 }
 function tone(f, d, type = "square", v = 0.04, f2 = 0, delay = 0) {
   if (!actx || muted) return;
@@ -1034,7 +1035,7 @@ function musicTick() {
   if (!actx || muted || paused || actx.state !== "running" || !S || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
   const now = actx.currentTime, mode = S.realm ? "realm" : S.boss ? "boss" : "wave";
   // Picking up after a pause, a mute or a new game: start a beat from now rather than racing to catch up.
-  if (!music.next || music.next < now - 0.2) music.next = now + 0.06;
+  if (!music.next || music.next < now) music.next = now + 0.06;
   if (mode !== music.mode) { music.mode = mode; music.step = 0; }
   const vol = S.blackout > 0 ? 0.25 : 1;
   if (vol !== music.vol) { music.vol = vol; musicBus().gain.setTargetAtTime(vol, now, 0.12); }
@@ -1085,6 +1086,8 @@ const input = {
   left: false, right: false, up: false, down: false, keyFire: false, touchFire: false, holdFire: false,
   dragging: false, lastFx: 0, lastFy: 0, target: W / 2, targetY: Y_MAX,
 };
+// What the opening banner says about the guns: with tilt steering the Fire button is held, so a tap would lock them on, not rest them.
+const restHint = () => (gyro.on ? "Guns overheat. Hold Fire to shoot, let go to rest them." : "Guns overheat. Tap Fire to rest them.");
 // The Fire button in the corner (or the F key): off means the ship flies without shooting, so the guns can cool.
 // Every game starts with it on. With tilt steering the same button is held down to shoot instead (as ordered by Jeremy),
 // and fireOn becomes a lock: a quick tap locks the guns on, for playing without touching the screen, and another tap unlocks them.
@@ -1119,22 +1122,35 @@ function spawnWave() {
   S.bugs = [];
   const gap = Math.max(0.7, 1.25 - (S.wave - 1) * 0.05), dur = Math.max(1.6, 2.2 - (S.wave - 1) * 0.04);
   SQUADS.forEach((row, k) => {
-    const [type, cols] = LAYOUT[row], side = k % 2 ? 1 : -1;
+    // Each squad takes one of six ways in, and the mix changes every wave: over the top, in from the side, up from
+    // underneath, straight down the middle, across from the far corner, or skimming low past the ship.
+    const [type, cols] = LAYOUT[row], side = (k + S.wave) % 2 ? 1 : -1, way = (S.wave + k * 5) % 6;
     cols.forEach((col, i) => {
       S.bugs.push({
         type, row, col, hp: type === "choker" ? 2 : 1, x: -99, y: -99,
         state: "enter", p: 0, dur, delay: k * gap + i * 0.12,
-        side, fromY: k === 1 || k === 3 ? 250 : -30, flash: 0, ph: Math.random() * TAU,
+        side, way, flash: 0, ph: Math.random() * TAU,
       });
     });
   });
   S.diveTimer = 3;
 }
+// The ways in. Each is where a squad starts and the two points that bend its path, for a squad coming from the right
+// (m = 1; the other side mirrors it), plus the size of the loop it flies before settling. None of them can hurt the ship:
+// a bug is only dangerous once it is in the formation and dives.
+const WAYS = [
+  { from: [230, -30], bend: [120, 10, 70, 30], R: 46 },     // over the top
+  { from: [230, 250], bend: [120, 290, 70, 30], R: 46 },    // in from the side
+  { from: [230, 610], bend: [150, 470, 90, 60], R: 46 },    // up from underneath
+  { from: [-30, -40], bend: [140, 120, 110, 40], R: 60 },   // straight down the middle
+  { from: [-230, 40], bend: [-60, 150, 60, 50], R: 46 },    // across from the far corner
+  { from: [230, 470], bend: [60, 520, 40, 70], R: 34 },     // skimming low past the ship
+];
 function entryPoint(b, p, sx, sy) {
-  const m = b.side, R = 46, cx = W / 2 - m * 20, bot = 320 + R;
+  const m = b.side, way = WAYS[b.way || 0], R = way.R, cx = W / 2 - m * 20, bot = 320 + R;
   if (p < 0.5) {
-    const t = p / 0.5;
-    return [bez3(W / 2 + m * 230, W / 2 + m * 120, cx + m * 70, cx, t), bez3(b.fromY, b.fromY + 40, bot + 30, bot, t)];
+    const t = p / 0.5, [fx, fy] = way.from, [ax, ay, bx, by] = way.bend;
+    return [bez3(W / 2 + m * fx, W / 2 + m * ax, cx + m * bx, cx, t), bez3(fy, ay, bot + by, bot, t)];
   }
   if (p < 0.78) {
     const a = Math.PI / 2 + m * ((p - 0.5) / 0.28) * TAU;
@@ -1263,8 +1279,8 @@ const BOSSES = {
 // Every boss coughs up an 8-ball when the fight starts and another when it turns ugly.
 function dropEightBall(B) { S.drops.push({ kind: "eightball", x: clamp(B.x + rand(-70, 70), 30, W - 30), y: B.y + 44, vy: 70 }); }
 function spawnBoss() {
-  const key = BOSS_ORDER[S.bossCount++ % BOSS_ORDER.length], hp = 45 + (S.bossCount - 1) * 25;
-  S.boss = { key, x: W / 2, y: -70, hp, maxHp: hp, ft: 0, state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0, balls: 0 };
+  const key = BOSS_ORDER[S.bossCount++ % BOSS_ORDER.length], hp = 60 + (S.bossCount - 1) * 30;
+  S.boss = { key, x: W / 2, y: -70, hp, maxHp: hp, ft: 0, sway: 0, state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0, balls: 0 };
   S.bugs = [];
   banner(BOSSES[key].intro[0], BOSSES[key].intro[1], C.pink);
   sfx.warn();
@@ -1332,8 +1348,11 @@ function updateBoss(dt) {
     return;
   }
   B.ft += dt;
-  B.x = W / 2 + Math.sin(B.ft * 0.7) * 105;
-  B.y = BOSS_Y + Math.sin(B.ft * 1.9) * 8;
+  // A boss weaves: a wide sweep with a quicker wobble on top of it, rising and falling as it goes. Past half health it does all of it a third faster.
+  // The weave runs on its own clock so that speeding up never makes it jump.
+  B.sway += dt * (B.hp < B.maxHp / 2 ? 1.35 : 1);
+  B.x = W / 2 + Math.sin(B.sway * 0.9) * 92 + Math.sin(B.sway * 2.3) * 26;
+  B.y = BOSS_Y + 12 * Math.min(1, B.sway) + Math.sin(B.sway * 1.3) * 22 + Math.sin(B.sway * 3.1) * 8;
   if (S.mode !== "play") return;
   B.atkCd -= dt;
   if (B.atkCd <= 0) {
@@ -1758,11 +1777,11 @@ function updatePlayer(dt) {
     sfx.shoot();
     // Nose candy and the 8-ball are too wired to overheat: no heat builds while either is running.
     if (S.turbo <= 0 && S.tweak <= 0 && !S.realm) {
-      S.heat += 0.045;
+      S.heat += 0.052;
       if (S.heat >= 1) {
         S.heat = 1; S.hot = true; S.stats.overheats++;
         pop("OVERHEATED", P.x, P.y - 34, C.red, 20); burst(P.x, P.y - 16, C.ink, 10); sfx.broke();
-        if (!S.seen.hot) { S.seen.hot = true; banner("Guns overheated", "Locked till they cool. Rest them with the Fire button, or find some nose candy.", C.red); }
+        if (!S.seen.hot) { S.seen.hot = true; banner("Guns overheated", `Locked till they cool. ${gyro.on ? "Let go of Fire now and then" : "Rest them with the Fire button"}, or find some nose candy.`, C.red); }
       }
     }
   }
@@ -1843,7 +1862,7 @@ function update(dt) {
   if (S.mode === "intro") {
     S.introT += dt;
     if (!S.introBoom && S.introT >= 1.5 && S.introT < INTRO) { S.introBoom = true; sfx.boom(); }
-    if (S.introT >= INTRO) { S.mode = "play"; fireBtn.hidden = false; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
+    if (S.introT >= INTRO) { S.mode = "play"; fireBtn.hidden = false; banner("Wave 1", `U.S.S. Mike Honcho, reporting for duty. ${restHint()}`, C.cyan); }
     return;
   }
   if (S.bump > 0) { S.bump = Math.max(0, S.bump - dt); return; }
@@ -2653,15 +2672,17 @@ function showOver() {
 function start() {
   ensureAudio();
   S = newState(); spawnWave();
+  music.step = 0; music.mode = "";
   // Shortcuts for testing the bosses: open the page with #boss1 to #boss5 on the end of the link (#bertha still works).
   const skip = /^#boss([1-5])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.dmtWave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
-  if (introSeen) banner("Wave 1", "Guns overheat. Tap Fire to rest them.", C.cyan);
-  else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
+  if (introSeen) banner("Wave 1", restHint(), C.cyan);
+  else if (reduced) { introSeen = true; banner("Wave 1", `U.S.S. Mike Honcho, reporting for duty. ${restHint()}`, C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
   fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
-  if (gyro.wanted && !gyro.on && TILT_OK) setGyro(true);
+  // An iPhone asks permission for tilt with a system prompt; the game waits behind it rather than starting without a pilot.
+  if (gyro.wanted && !gyro.on && TILT_OK) { paused = true; setGyro(true).finally(() => { paused = document.hidden; last = performance.now(); }); }
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
 
@@ -2809,7 +2830,7 @@ document.addEventListener("pointermove", (e) => {
 // Called with no event (the page lost focus or was hidden), every finger is let go at once.
 const release = (e) => {
   const id = idOf(e);
-  if (e) fingers.delete(id); else { fingers.clear(); input.holdFire = false; }
+  if (e) fingers.delete(id); else { fingers.clear(); input.holdFire = false; syncFire(); }
   if (e && steerId !== null && id !== steerId) return;
   const next = fingers.keys().next();
   if (input.dragging && !next.done) { steerWith(next.value); return; }
@@ -2874,7 +2895,7 @@ async function setGyro(on) {
   fireOn = !on; input.holdFire = false;
   syncGyro(); syncFire();
   // No tilt reading within two seconds means there is no sensor to steer with.
-  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; fireOn = true; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); syncFire(); } }, 2000);
+  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; gyro.wanted = false; store.set("sd-tilt", false); fireOn = true; input.holdFire = false; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); syncFire(); } }, 2000);
 }
 tiltBtn.addEventListener("click", () => { setGyro(!gyro.on); tiltBtn.blur(); });
 syncGyro();
@@ -2888,9 +2909,14 @@ function syncFire() {
   fireBtn.classList.toggle("hold", hold);
 }
 function toggleFire() { fireOn = !fireOn; syncFire(); }
-fireBtn.addEventListener("click", () => { if (!gyro.on) toggleFire(); fireBtn.blur(); });
+fireBtn.addEventListener("click", () => {
+  // A press that began as a hold is followed, a moment after the finger lifts, by a click. That click is never a toggle,
+  // even if tilt was switched off while the finger was down.
+  if (performance.now() - heldUp > 400 && !gyro.on) toggleFire();
+  fireBtn.blur();
+});
 // With tilt steering: down is fire, up is stop, and a press shorter than a quarter of a second flips the lock.
-let heldAt = 0;
+let heldAt = 0, heldUp = -1e9;
 fireBtn.addEventListener("pointerdown", (e) => {
   if (!gyro.on) return;
   e.preventDefault();
@@ -2899,6 +2925,7 @@ fireBtn.addEventListener("pointerdown", (e) => {
   input.holdFire = true; heldAt = performance.now(); syncFire();
 });
 const letGo = (e) => {
+  if (e.type === "pointerup") heldUp = performance.now();
   if (!input.holdFire) return;
   input.holdFire = false;
   if (gyro.on && e.type === "pointerup" && performance.now() - heldAt < 250) fireOn = !fireOn;
@@ -2924,6 +2951,7 @@ document.addEventListener("visibilitychange", () => {
   paused = document.hidden;
   last = performance.now();
   if (paused) { input.left = input.right = input.up = input.down = input.keyFire = false; release(); }
+  else if (actx) ensureAudio();
 });
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
