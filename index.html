@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c0716">
-<title>Manly Galaxy</title>
+<title>Spaceballs Deep</title>
 <meta name="description" content="Space bugs, escorts, nose candy, booze and STDs. As ordered by Jeremy.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,11 +66,11 @@ body {
 .overlay > :last-child { margin-bottom: auto; }
 .neon {
   font-family: var(--font-neon); font-weight: 400; margin: 0;
-  font-size: calc(var(--u) * 50); line-height: 1.02; letter-spacing: 0.02em;
+  font-size: calc(var(--u) * 37); line-height: 1.02; letter-spacing: 0.02em;
   color: var(--pink);
   text-shadow: 0 0 calc(var(--u) * 5) var(--pink), 0 0 calc(var(--u) * 20) var(--pink);
 }
-.neon .gold { color: var(--gold); text-shadow: 0 0 calc(var(--u) * 5) var(--gold), 0 0 calc(var(--u) * 20) var(--gold); }
+.neon .gold { font-size: 1.5em; color: var(--gold); text-shadow: 0 0 calc(var(--u) * 5) var(--gold), 0 0 calc(var(--u) * 20) var(--gold); }
 .neon .flick { animation: flicker 6s infinite steps(1); }
 @keyframes flicker { 0%, 61%, 64%, 66%, 100% { opacity: 1; } 62%, 65% { opacity: 0.25; } }
 .tag { font-size: calc(var(--u) * 19); line-height: 1.1; text-wrap: balance; }
@@ -181,10 +181,10 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 <body>
 
 <div id="stage">
-  <canvas id="game" aria-label="Manly Galaxy, a space shooter"></canvas>
+  <canvas id="game" aria-label="Spaceballs Deep, a space shooter"></canvas>
 
   <section id="title" class="overlay">
-    <h1 class="neon"><span>Manly</span><br><span class="gold">Gal<span class="flick">a</span>xy</span></h1>
+    <h1 class="neon"><span>Spaceballs</span><br><span class="gold">D<span class="flick">e</span>ep</span></h1>
     <p class="tag">Escorts, nose candy, booze and STDs.<br><em>As ordered by Jeremy.</em></p>
     <div class="legend">
       <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Bugs</b><span>$1 to $5 a pop</span></div></div>
@@ -236,7 +236,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v3</span>
+  <span id="ver">v4</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
