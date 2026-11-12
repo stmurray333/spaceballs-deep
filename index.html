@@ -303,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v30</span>
+  <span id="ver">v31</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -353,14 +353,14 @@ try {
 } catch {}
 
 // ---------- sound ----------
-let actx = null, noiseBuf = null, muted = store.get("sd-muted", false);
+let actx = null, noiseBuf = null, muted = store.get("sd-muted", false), hush = false;
 function ensureAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; } }
   // An iPhone can leave the audio "interrupted" after a call or a trip to another app, so anything short of running gets a resume.
   if (actx && actx.state !== "running" && actx.state !== "closed") actx.resume().catch(() => {});
 }
 function tone(f, d, type = "square", v = 0.04, f2 = 0, delay = 0) {
-  if (!actx || muted) return;
+  if (!actx || muted || hush) return;
   const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t0);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
@@ -379,7 +379,7 @@ function noise() {
   return noiseBuf;
 }
 function hiss(d, v = 0.08, freq = 1200) {
-  if (!actx || muted) return;
+  if (!actx || muted || hush) return;
   const t0 = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
   src.buffer = noise(); f.type = "bandpass";
   f.frequency.setValueAtTime(freq, t0); f.frequency.exponentialRampToValueAtTime(freq * 2.5, t0 + d);
@@ -1611,7 +1611,7 @@ const MUG_CUES = [
   [MUG.light, () => { hiss(0.09, 0.1, 500); tone(180, 0.14, "square", 0.05, 90); }],
   [MUG.name, () => tone(131, 0.35, "sawtooth", 0.07, 52)],
   [MUG.name + 0.5, () => { tone(98, 0.6, "sawtooth", 0.08, 41); tone(196, 0.6, "square", 0.03, 185); }],
-  ...[0, 1, 2, 3, 4].map((i) => [MUG.grab + 0.05 + i * 0.16, () => tone(i % 2 ? 250 : 210, 0.06, "square", 0.022)]),
+  ...[0, 1, 2, 3, 4].map((i) => [MUG.grab + 0.55 + i * 0.15, () => tone(i % 2 ? 250 : 210, 0.06, "square", 0.022)]),
   [MUG.smack - 0.75, () => tone(190, 0.6, "sine", 0.035, 760)],
   [MUG.smack, () => { S.shake = 0.7; sfx.hurt(); hiss(0.22, 0.12, 900); }],
   ...[0.3, 0.5, 0.7].map((d) => [MUG.smack + d, () => tone(1500, 0.07, "sine", 0.02, 1900)]),
@@ -1626,7 +1626,11 @@ function mugTick(dt) {
   const M = S.mug;
   M.t += dt;
   S.shake = Math.max(0, S.shake - dt);
+  // An iPhone can stall the audio (a call, Siri) while the page stays up. Thirteen seconds of sound written onto a
+  // stopped clock would all go off at once on the next touch, so while it is stalled the scene's sounds are dropped.
+  hush = !!actx && actx.state !== "running";
   while (M.cue < MUG_CUES.length && M.t >= MUG_CUES[M.cue][0]) MUG_CUES[M.cue++][1](M);
+  hush = false;
   if (M.t >= MUG.len) {
     S.mug = null; S.player.inv = Math.max(S.player.inv, 3);
     const E = S.escort;
@@ -2739,18 +2743,18 @@ function drawMug(g) {
     g.globalAlpha = a * dark; g.font = `${size}px ${FONT_SIGN}`; g.fillStyle = color; g.shadowColor = color; g.shadowBlur = 14;
     g.fillText(text, 0, 0); g.restore();
   };
-  const typed = (text, y, color, from, to) => {
+  const typed = (text, y, color, from, to, per = 0.04) => {
     const a = clamp((to - t) / 0.15, 0, 1);
     if (t < from || a <= 0) return;
     g.globalAlpha = a * dark; g.font = `26px ${FONT_HUD}`; g.fillStyle = color;
     const x = W / 2 - g.measureText(text).width / 2;
-    g.textAlign = "left"; g.fillText(text.slice(0, Math.ceil((t - from) / 0.04)), x, y); g.textAlign = "center";
+    g.textAlign = "left"; g.fillText(text.slice(0, Math.ceil((t - from) / per)), x, y); g.textAlign = "center";
   };
   typed("THAT'S A LOT OF MONEY.", 196, C.ink, MUG.dark + 0.1, 2.5);
   typed("SOMEBODY NOTICED.", 196, C.red, 2.65, MUG.light - 0.05);
   slam("GANGSTER", W / 2, 96, 24, C.pink, MUG.name, MUG.leave + 0.3, 1.4);
   slam("SCUBA STEVE", W / 2, 128, 32, C.cyan, MUG.name + 0.5, MUG.leave + 0.3, 1.4);
-  typed("NICE STACK YOU GOT THERE.", 470, C.ink, MUG.grab + 0.05, MUG.smack - 0.1);
+  typed("NICE STACK YOU GOT THERE.", 470, C.ink, MUG.grab + 0.55, MUG.smack, 0.03);
   slam("SMACK!", 112, 250, 38, C.red, MUG.smack, MUG.take + 0.1, 0.6);
   slam("RUN THEM POCKETS", W / 2, 470, 22, C.gold, MUG.take, MUG.laugh - 0.05, 0.6);
   slam("HA HA HA HA", W / 2, 470 + (reduced ? 0 : Math.sin(t * 20) * 4), 30, C.gold, MUG.laugh, MUG.leave);
@@ -3073,7 +3077,7 @@ function start() {
   const skip = /^#boss([1-5])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.dmtWave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
   // And one for watching the mugging without earning it: #steve starts the game with $1,000 in hand.
-  if (location.hash === "#steve") { const gift = MUG.at - S.cents; S.cents += gift; S.stats.earned += gift; }
+  if (PRANK && location.hash === "#steve") { const gift = MUG.at - S.cents; S.cents += gift; S.stats.earned += gift; }
   if (introSeen) banner("Wave 1", restHint(), C.cyan);
   else if (reduced) { introSeen = true; banner("Wave 1", `U.S.S. Mike Honcho, reporting for duty. ${restHint()}`, C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
