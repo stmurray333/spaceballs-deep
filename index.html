@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v22</span>
+  <span id="ver">v23</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1032,7 +1032,7 @@ function playStep(mode, i, t) {
   if (s === 4 || s === 12) drum(t, 0.09, LOUD.snare, 1800);
 }
 function musicTick() {
-  if (!actx || muted || paused || actx.state !== "running" || !S || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
+  if (!actx || muted || paused || asking || actx.state !== "running" || !S || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
   const now = actx.currentTime, mode = S.realm ? "realm" : S.boss ? "boss" : "wave";
   // Picking up after a pause, a mute or a new game: start a beat from now rather than racing to catch up.
   if (!music.next || music.next < now) music.next = now + 0.06;
@@ -1351,8 +1351,10 @@ function updateBoss(dt) {
   // A boss weaves: a wide sweep with a quicker wobble on top of it, rising and falling as it goes. Past half health it does all of it a third faster.
   // The weave runs on its own clock so that speeding up never makes it jump.
   B.sway += dt * (B.hp < B.maxHp / 2 ? 1.35 : 1);
-  B.x = W / 2 + Math.sin(B.sway * 0.9) * 92 + Math.sin(B.sway * 2.3) * 26;
-  B.y = BOSS_Y + 12 * Math.min(1, B.sway) + Math.sin(B.sway * 1.3) * 22 + Math.sin(B.sway * 3.1) * 8;
+  // How far it goes depends on how wide it is, so tentacles and gun barrels stay on the screen.
+  const reach = W / 2 - (BOSSES[B.key].hw || 40) - 20;
+  B.x = W / 2 + (Math.sin(B.sway * 0.9) * 0.78 + Math.sin(B.sway * 2.3) * 0.22) * reach;
+  B.y = BOSS_Y + 16 * Math.min(1, B.sway) + Math.sin(B.sway * 1.3) * 20 + Math.sin(B.sway * 3.1) * 6;
   if (S.mode !== "play") return;
   B.atkCd -= dt;
   if (B.atkCd <= 0) {
@@ -2682,7 +2684,7 @@ function start() {
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
   fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
   // An iPhone asks permission for tilt with a system prompt; the game waits behind it rather than starting without a pilot.
-  if (gyro.wanted && !gyro.on && TILT_OK) { paused = true; setGyro(true).finally(() => { paused = document.hidden; last = performance.now(); }); }
+  if (gyro.wanted && !gyro.on && TILT_OK) { asking = true; setGyro(true).finally(() => { asking = false; last = performance.now(); }); }
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
 
@@ -2891,11 +2893,22 @@ async function setGyro(on) {
     if (answer !== "granted") { gyro.wanted = false; store.set("sd-tilt", false); syncGyro("Tilt was blocked.\nAllow motion access, then try again."); return; }
   }
   gyro.on = on; gyro.wanted = on; gyro.seen = false; store.set("sd-tilt", on);
+  shownAt = performance.now();
   // Tilt starts with the guns unlocked (hold to fire); dragging starts with them on.
   fireOn = !on; input.holdFire = false;
   syncGyro(); syncFire();
-  // No tilt reading within two seconds means there is no sensor to steer with.
-  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; gyro.wanted = false; store.set("sd-tilt", false); fireOn = true; input.holdFire = false; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); syncFire(); } }, 2000);
+  // The opening banner may have been written before tilt came on (an iPhone answers the permission prompt first).
+  if (S && S.banner && S.banner.title === "Wave 1") S.banner.sub = S.banner.sub.replace(/Guns overheat\..*$/, restHint());
+  if (on) setTimeout(noSensor, 2000);
+}
+// No tilt reading after two seconds in view means there is no sensor to steer with, and the choice is forgotten.
+// A hidden page is sent no readings at all, so time spent hidden does not count against the phone.
+let shownAt = 0;
+function noSensor() {
+  if (!gyro.on || gyro.seen) return;
+  if (document.hidden || performance.now() - shownAt < 1900) { setTimeout(noSensor, 2000); return; }
+  gyro.on = false; gyro.wanted = false; store.set("sd-tilt", false); fireOn = true; input.holdFire = false;
+  syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); syncFire();
 }
 tiltBtn.addEventListener("click", () => { setGyro(!gyro.on); tiltBtn.blur(); });
 syncGyro();
@@ -2916,16 +2929,18 @@ fireBtn.addEventListener("click", () => {
   fireBtn.blur();
 });
 // With tilt steering: down is fire, up is stop, and a press shorter than a quarter of a second flips the lock.
-let heldAt = 0, heldUp = -1e9;
+let heldAt = 0, heldUp = -1e9, heldPress = false;
 fireBtn.addEventListener("pointerdown", (e) => {
   if (!gyro.on) return;
   e.preventDefault();
   try { fireBtn.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
-  input.holdFire = true; heldAt = performance.now(); syncFire();
+  input.holdFire = true; heldPress = true; heldAt = performance.now(); syncFire();
 });
 const letGo = (e) => {
-  if (e.type === "pointerup") heldUp = performance.now();
+  // Only a press that began as a hold is followed by a click to ignore. An ordinary tap while dragging never sets this,
+  // so its click still switches the guns on and off.
+  if (heldPress && e.type !== "lostpointercapture") { heldPress = false; if (e.type === "pointerup") heldUp = performance.now(); }
   if (!input.holdFire) return;
   input.holdFire = false;
   if (gyro.on && e.type === "pointerup" && performance.now() - heldAt < 250) fireOn = !fireOn;
@@ -2946,17 +2961,17 @@ muteBtn.addEventListener("click", () => {
 syncMute();
 
 // ---------- loop ----------
-let last = performance.now(), paused = false;
+let last = performance.now(), paused = false, asking = false;
 document.addEventListener("visibilitychange", () => {
   paused = document.hidden;
   last = performance.now();
   if (paused) { input.left = input.right = input.up = input.down = input.keyFire = false; release(); }
-  else if (actx) ensureAudio();
+  else { shownAt = performance.now(); if (actx) ensureAudio(); }
 });
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  if (!paused) update(dt);
+  if (!paused && !asking) update(dt);
   render();
   musicTick();
   requestAnimationFrame(frame);
