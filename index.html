@@ -239,7 +239,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v8</span>
+  <span id="ver">v9</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
@@ -955,9 +955,10 @@ function updateFlyers(dt) {
     }
     if (f.kind === "cop" && S.mode === "play" && !f.done) {
       // The searchlight is the same cone as a choker beam. Half a second in it and you blow.
-      // It only counts while you can see it: not during a blackout, and not before the cop is on screen.
+      // It only counts while you can see it and react: not while the ship is blinking (a blackout, which
+      // blinks a little longer than the screen stays dark, or just after a hit), and not before the cop is on screen.
       const top = f.y + 14, hw = 8 + ((P.y - top) / (H - 8 - top)) * 46;
-      if (S.blackout <= 0 && f.x > 20 && f.x < W - 20 && Math.abs(P.x - f.x) < hw - 4) { f.scan += dt; if (f.scan >= 0.5) breathalyzer(f); }
+      if (P.inv <= 0 && f.x > 20 && f.x < W - 20 && Math.abs(P.x - f.x) < hw - 4) { f.scan += dt; if (f.scan >= 0.5) breathalyzer(f); }
       else f.scan = 0;
     }
     if (f.vx > 0 ? f.x > W + 60 : f.x < -60) f.dead = true;
@@ -1139,7 +1140,7 @@ function hitBug(b) {
   else if (r < 0.16) kind = "candy";
   else if (r < 0.22) kind = "beer";
   else if (r < 0.26 && S.rubbers < 3) kind = "rubber";
-  else if (r < 0.32 && sick()) kind = "clinic";
+  else if (r < 0.32 && sick() && !S.drops.some((d) => d.kind === "clinic")) kind = "clinic";
   else if (r < 0.36) kind = "dime";
   else if (r < 0.375) kind = "eighth";
   if (kind) S.drops.push({ kind, x: b.x, y: b.y, vy: 85 });
@@ -1283,7 +1284,12 @@ function updateVices(dt) {
     S.blackout -= dt;
     if (S.blackout <= 0) {
       S.blackout = 0; S.cents -= 500; S.billCents += 500; S.stats.texts += 50;
-      banner("You blacked out", "You drunk texted your ex 50 times. That's $5.00.", C.red); sfx.burp();
+      // A banner that went up in the dark gets its full run now, and the phone bill rides along as a pop.
+      if (S.banner && S.banner.max - S.banner.life < 2.4) {
+        S.banner.life = S.banner.max;
+        pop("Blacked out. 50 texts to your ex. -$5.00", P.x, P.y - 34, C.red, 16);
+      } else banner("You blacked out", "You drunk texted your ex 50 times. That's $5.00.", C.red);
+      sfx.burp();
     }
   }
   if (S.dormant > 0) {
@@ -1582,25 +1588,31 @@ function drawHUD(g) {
     g.strokeStyle = C.dim; g.lineWidth = 1; g.strokeRect(bx, 79, bw, 7);
     y = 92;
   }
+  // Timed boosts share one line (spelled out when there is only one) and the escort gets the next.
+  // The STD list sits in the empty strip under the ship, so nothing is ever printed over the bugs.
   g.font = `17px ${FONT_HUD}`;
-  if (S.turbo > 0) {
-    g.fillStyle = C.pink;
-    g.fillText(`NOSE CANDY TURBO ${S.turbo.toFixed(1)}s · ${Math.round(110 + S.turbo * 9)} BPM`, W / 2, y); y += 16;
-  } else if (S.crash > 0) {
-    g.fillStyle = C.dim; g.fillText("THE CRASH · everything is slow", W / 2, y); y += 16;
+  const boosts = [];
+  if (S.turbo > 0) boosts.push([`NOSE CANDY TURBO ${S.turbo.toFixed(1)}s · ${Math.round(110 + S.turbo * 9)} BPM`, `TURBO ${S.turbo.toFixed(1)}s`, C.pink]);
+  else if (S.crash > 0) boosts.push(["THE CRASH · everything is slow", "CRASH", C.dim]);
+  if (S.high > 0) boosts.push([`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, `HIGH ${S.high.toFixed(1)}s`, C.lime]);
+  if (S.tweak > 0) boosts.push([`8-BALL · triple shots · ${S.tweak.toFixed(1)}s`, `8-BALL ${S.tweak.toFixed(1)}s`, C.cyan]);
+  if (boosts.length) {
+    g.fillStyle = boosts.length === 1 ? boosts[0][2] : C.ink;
+    g.fillText(boosts.length === 1 ? boosts[0][0] : boosts.map((b) => b[1]).join(" · "), W / 2, y); y += 16;
   }
-  if (S.high > 0) { g.fillStyle = C.lime; g.fillText(`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, W / 2, y); y += 16; }
-  if (S.tweak > 0) { g.fillStyle = C.cyan; g.fillText(`8-BALL · triple shots · ${S.tweak.toFixed(1)}s`, W / 2, y); y += 16; }
   if (S.escort && S.escort.free) {
-    g.fillStyle = C.gold; g.fillText(`THE HOT ONE · on the house · ${Math.ceil(S.escort.life)}s`, W / 2, y); y += 16;
+    g.fillStyle = C.gold; g.fillText(`THE HOT ONE · on the house · ${Math.ceil(S.escort.life)}s`, W / 2, y);
   } else if (S.escort) {
-    g.fillStyle = C.pink; g.fillText(`ESCORT ON THE CLOCK · -$1.00/s · ${Math.ceil(S.escort.life)}s`, W / 2, y); y += 16;
+    g.fillStyle = C.pink; g.fillText(`ESCORT ON THE CLOCK · -$1.00/s · ${Math.ceil(S.escort.life)}s`, W / 2, y);
   }
   const stds = [
     S.std.clap && "THE CLAP", S.std.crabs && "CRABS",
     S.std.herpes && (S.dormant > 0 ? "HERPES (NAPPING)" : S.flare > 0 ? "HERPES FLARE-UP" : "HERPES"),
   ].filter(Boolean);
-  if (stds.length) { g.fillStyle = S.flare > 0 ? C.red : C.lime; g.fillText(stds.join(" · "), W / 2, y); }
+  if (stds.length) {
+    g.font = `14px ${FONT_HUD}`; g.fillStyle = S.flare > 0 ? C.red : C.lime;
+    g.fillText(stds.join(" · "), W / 2, H - 34);
+  }
 }
 function drawBanner(g) {
   const b = S.banner;
@@ -1631,9 +1643,10 @@ function render() {
   if (S.mode === "intro") { drawIntro(ctx); return; }
 
   // Past two drinks the room tilts. Ships, bugs and shots tilt together, so what you see is still what hits.
+  // It pivots on the ship's row, so the ship and anything about to hit it never slide off the edge.
   const sloshed = reduced ? 0 : Math.max(0, Math.min(S.drinks, 4) - 1);
-  const tilt = Math.max(0, sloshed - 1) * 0.03 * Math.sin(S.t * 0.9);
-  const tiltWorld = () => { ctx.translate(W / 2, H / 2); ctx.rotate(tilt); ctx.translate(-W / 2, -H / 2); };
+  const tilt = Math.max(0, sloshed - 1) * 0.02 * Math.sin(S.t * 0.9);
+  const tiltWorld = () => { ctx.translate(W / 2, S.player.y); ctx.rotate(tilt); ctx.translate(-W / 2, -S.player.y); };
   ctx.save(); tiltWorld();
   for (const b of S.bugs) if (b.state === "beam") drawBeam(ctx, b);
   for (const f of S.flyers) if (f.kind === "cop" && !f.done) drawSearchlight(ctx, f);
