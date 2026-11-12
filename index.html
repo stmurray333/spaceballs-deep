@@ -277,7 +277,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v17</span>
+  <span id="ver">v18</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -497,12 +497,15 @@ function drawBug(g, type, x, y, t, flash, damaged) {
 }
 function drawDrop(g, kind, x, y, t) {
   g.save(); g.translate(x, y + Math.sin(t * 4) * 1.5);
-  if (kind === "dmt") {
-    // A little black hole of your own: three coloured arcs chasing each other round a dark middle.
-    g.shadowColor = C.lime; g.shadowBlur = 10;
-    g.fillStyle = C.void; g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.fill();
-    g.shadowBlur = 0; g.lineWidth = 2.4; g.lineCap = "round";
-    [C.lime, C.pink, C.cyan].forEach((c, i) => { g.strokeStyle = c; g.beginPath(); g.arc(0, 0, 8.5, (reduced ? 0 : t * 5) + i * 2.1, (reduced ? 0 : t * 5) + i * 2.1 + 1.5); g.stroke(); });
+  if (kind === "waffle") {
+    // A waffle: a golden square with the grid pressed into it and a pat of butter.
+    g.shadowColor = C.gold; g.shadowBlur = 10;
+    g.fillStyle = C.gold; g.fillRect(-9, -9, 18, 18);
+    g.shadowBlur = 0; g.strokeStyle = C.void; g.lineWidth = 1.2; g.globalAlpha = 0.55;
+    g.beginPath();
+    for (const q of [-3, 3]) { g.moveTo(q, -9); g.lineTo(q, 9); g.moveTo(-9, q); g.lineTo(9, q); }
+    g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = C.ink; g.fillRect(-3, -3, 6, 6);
   } else if (kind === "candy") {
     g.shadowColor = C.ink; g.shadowBlur = 10;
     g.fillStyle = C.ink; g.fillRect(-7, -8, 14, 16);
@@ -1002,7 +1005,7 @@ function newState() {
     mode: "play", t: 0, wt: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpWave: 0, realm: null, dmtWave: 0,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1012,7 +1015,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0,
     },
   };
 }
@@ -1306,7 +1309,7 @@ function shotHit(e) {
   }[k] || ["Shot down", pick(SHOT_LINES)];
   hurt(line[0], line[1]);
 }
-function hitBug(b, dmg = 1) {
+function hitBug(b, dmg = 1, quiet = false) {
   b.hp -= dmg; b.flash = 0.08;
   if (b.hp > 0) { sfx.tink(); return; }
   b.dead = true;
@@ -1316,7 +1319,7 @@ function hitBug(b, dmg = 1) {
   S.cents += v; S.stats.earned += v; S.stats.kills++;
   pop("+" + money(v), b.x, b.y, diving ? C.gold : C.ink, diving ? 18 : 15);
   burst(b.x, b.y, b.type === "drone" ? C.lime : b.type === "hornet" ? C.pink : C.gold, 14);
-  sfx.pop();
+  if (!quiet) sfx.pop();
   const r = Math.random();
   let kind = null;
   if (r < 0.02 && S.lives < 5) kind = "cody";
@@ -1327,9 +1330,9 @@ function hitBug(b, dmg = 1) {
   else if (r < 0.32 && sick() && !S.drops.some((d) => d.kind === "clinic")) kind = "clinic";
   else if (r < 0.36) kind = "dime";
   else if (r < 0.375) kind = "eighth";
-  // DMT, as ordered by Jeremy: at most one a wave. Wave 2 always coughs one up so everybody sees the realm; after that it is luck.
-  if (S.dmtWave !== S.wave && !S.realm && (Math.random() < 0.015 || (S.wave === 2 && S.bugs.filter((o) => !o.dead).length <= 12))) {
-    kind = "dmt"; S.dmtWave = S.wave;
+  // Waffle House employee training, as ordered by Jeremy: at most one a wave. Wave 1 always has one so everybody gets a shift.
+  if (S.waffleWave !== S.wave && (Math.random() < 0.012 || (S.wave === 1 && S.bugs.filter((o) => !o.dead).length <= 20))) {
+    kind = "waffle"; S.waffleWave = S.wave;
   }
   if (kind) S.drops.push({ kind, x: b.x, y: b.y, vy: 85 });
 }
@@ -1363,8 +1366,8 @@ function collect(kind) {
     S.hot = false; S.heat = 0;
     if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
-  } else if (kind === "dmt") {
-    enterRealm();
+  } else if (kind === "waffle") {
+    waffleHouse();
   } else {
     S.lives++; S.stats.cody++;
     banner("Navy SEAL Cody", "has entered the chat. +1 life", C.gold); sfx.power();
@@ -1387,18 +1390,35 @@ function hurt(title, sub) {
   if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; S.realm = null; input.touchFire = false; }
 }
 
-// ---------- the DMT realm, as ordered by Jeremy: a black hole opens, and on the far side machine elves pay cash ----------
-// While you are in there the world outside stands still: bugs, bosses, shots and drops all wait. Your own buzz does not.
-// Nothing in the realm can hurt you. Five squads of eight come out of the door in the middle; get all forty for a bonus.
-const REALM = { in: 1.3, out: 1, squads: 5, per: 8, every: 2.6, cross: 3.6, pay: 200, perfect: 5000 };
-// Where an elf is, a fraction u of the way along its squad's path.
+// ---------- Waffle House employee training, as ordered by Jeremy: like the lightning in 1942, it clears the screen ----------
+// Every bug and flyer on screen goes down and pays, every enemy shot is wiped, and a boss takes fifteen. The cops are still bulletproof.
+function waffleHouse() {
+  S.stats.waffles++; S.wipe = 0.9; S.shake = 0.5;
+  let n = 0;
+  for (const b of S.bugs) if (!b.dead && b.delay <= 0 && b.y > -20) { hitBug(b, 99, true); n++; }
+  for (const f of S.flyers) if (!f.dead && f.kind !== "cop") { hitFlyer(f, 99); n++; }
+  S.ebullets = [];
+  if (S.boss && S.boss.state === "fight") { hitBoss(S.boss, 15); n++; }
+  banner("Waffle House employee training", n ? `Third shift. ${n} scattered, smothered and covered.` : "Third shift. Nothing left to clear off.", C.gold);
+  sfx.boom();
+}
+
+// ---------- the DMT realm, as ordered by Jeremy: a challenge stage like the ones in Galaga, before every boss ----------
+// When the second wave of each three is cleared, a black hole opens and takes the ship somewhere else for a while.
+// The world outside stands still. Nothing in the realm can hurt you. Eight squads of ten machine elves come through
+// and every one you hit pays; get all eighty for a bonus. Then you are put back, and the boss turns up as usual.
+const REALM = { in: 1.3, out: 1, squads: 8, per: 10, every: 1.6, cross: 3.2, pay: 200, perfect: 10000 };
+// Where an elf is, a fraction u of the way along its squad's path. Most of the paths start and end at the door in the middle.
 function elfAt(path, u) {
-  const a = u * TAU;
+  const a = u * TAU, cx = W / 2;
   if (path === 0) return [-20 + 400 * u, 150 + 60 * Math.sin(a * 1.5)];
   if (path === 1) return [380 - 400 * u, 300 + 60 * Math.sin(a * 1.5)];
-  if (path === 2) { const r = 20 + 120 * Math.sin(Math.PI * u); return [W / 2 + Math.cos(a * 2) * r, 230 + Math.sin(a * 2) * r * 0.85]; }
-  if (path === 3) return [W / 2 + 150 * Math.sin(a), 230 + 110 * Math.sin(a * 2)];
-  return [W / 2 - 150 * Math.sin(a), 230 + 120 * Math.sin(a * 2)];
+  if (path === 2) { const r = 20 + 120 * Math.sin(Math.PI * u); return [cx + Math.cos(a * 2) * r, 230 + Math.sin(a * 2) * r * 0.85]; }
+  if (path === 3) return [cx + 150 * Math.sin(a), 230 + 110 * Math.sin(a * 2)];
+  if (path === 4) return [cx - 150 * Math.sin(a), 230 + 120 * Math.sin(a * 2)];
+  if (path === 5) return [cx + 150 * Math.sin(a * 2) * Math.cos(a), 230 + 130 * Math.sin(a * 2) * Math.sin(a)];
+  if (path === 6) return [cx + 150 * Math.sin(a * 3), 60 + 320 * u];
+  return [cx + 160 * Math.sin(a), 230 - 135 * Math.cos(a)];
 }
 function enterRealm() {
   const P = S.player;
@@ -1406,7 +1426,7 @@ function enterRealm() {
   // Nothing can touch you once the portal is open, including a shot landing in the same frame as the pickup.
   P.inv = Math.max(P.inv, 0.1);
   S.stats.trips++; S.bullets = [];
-  banner("DMT", "The portal is open. Machine elves pay cash.", C.lime); sfx.power();
+  banner("Challenge stage", `The DMT kicks in. ${REALM.squads * REALM.per} machine elves and worse. Nothing in there can hurt you.`, C.lime); sfx.power();
 }
 function leaveRealm() {
   const R = S.realm, P = S.player, all = REALM.squads * REALM.per, perfect = R.killed === all;
@@ -1414,7 +1434,7 @@ function leaveRealm() {
   // Back where you left from, with a moment's grace before anything can touch you.
   P.x = R.x; P.y = R.y; input.target = clamp(P.x, edgeX(), W - edgeX()); input.targetY = P.y; P.inv = Math.max(P.inv, 2);
   S.bullets = []; S.realm = null;
-  banner(perfect ? "Perfect trip" : "Back from the realm", `${R.killed} of ${all} machine elves. ${R.cents ? "+" + money(R.cents) : "They got away with it"}${perfect ? ", bonus included" : ""}.`, C.lime);
+  banner(perfect ? "Perfect trip" : "Back from the realm", `${R.killed} of ${all} machine elves and friends. ${R.cents ? "+" + money(R.cents) : "They got away with it"}${perfect ? ", bonus included" : ""}.`, C.lime);
   sfx.power();
 }
 function updateRealm(dt) {
@@ -1462,8 +1482,10 @@ const wired = () => S.turbo > 0 || S.tweak > 0;
 const sloppy = () => (wired() ? 0 : Math.min(S.drinks, 4));
 // Jeremy's key bump: a sniff of nose candy with three or more beers on board stops the world for a beat and says so.
 // Once a wave, and never for the 8-ball, at his request; otherwise the sniff just gets the small pop.
+// The same card, with a beer on it, tells you when you have just got hammered (also once a wave).
 const BUMP = 0.75;
-function keyBump() { S.bump = BUMP; S.bumpWave = S.wave; S.shake = 0; S.stats.bumps++; sfx.power(); }
+function card(kind) { S.bump = BUMP; S.bumpKind = kind; S.shake = 0; sfx.power(); }
+function keyBump() { S.bumpWave = S.wave; S.stats.bumps++; card("key"); }
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
 // Rounded up, because a drink starts wearing off the moment it lands and two quick beers should still blow .08.
 const bac = () => Math.ceil(S.drinks * 4 - 1e-6);
@@ -1482,7 +1504,10 @@ function drink() {
   pop(`*GLUG* pay and power x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
   if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more and your shots hit harder when you're drunk. Your aim does not improve.", C.gold); }
   // Jeremy's pop-ups: when things go sideways, say what to grab next.
-  else if (was < 3 && drunkLevel() === 3 && S.drinks <= 4 && !wired()) banner("You're hammered", "Find some booger sugar, quick.", C.gold);
+  else if (was < 3 && drunkLevel() === 3 && S.drinks <= 4 && !wired()) {
+    if (S.hamWave !== S.wave) { S.hamWave = S.wave; card("hammered"); }
+    else banner("You're hammered", "Find some booger sugar, quick.", C.gold);
+  }
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
   if (S.drinks > 4) { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
 }
@@ -1500,7 +1525,8 @@ function afterEscort(E) {
   const P = S.player, drunk = bac() >= 8;
   const open = Object.keys(STD).filter((k) => !S.std[k]);
   if (!open.length) return;
-  if (S.rubbers > 0 && !drunk) {
+  // A rubber in your pocket always gets used. (It used to be forgotten when drunk, which read as a bug with three in hand.)
+  if (S.rubbers > 0) {
     S.rubbers--; S.stats.rubbersUsed++;
     pop(open.length < 3 ? "Wrapped it. Nothing new." : "Wrapped it. You're clean.", P.x, P.y - 52, C.lime, 16);
     return;
@@ -1512,7 +1538,7 @@ function afterEscort(E) {
   if (k === "herpes") { S.flare = 0; S.flareCd = 5; S.dormant = 0; }
   // A banner that only just went up (the DUI that scared her off, say) keeps the stage; this rides along as a pop.
   if (S.banner && S.banner.max - S.banner.life < 0.6) pop(title, P.x, P.y - 52, C.lime, 18);
-  else banner(title, (drunk && S.rubbers > 0 ? "Too drunk to find the rubber. " : "") + sub, C.lime);
+  else banner(title, sub, C.lime);
   sfx.sick();
 }
 function clinic() {
@@ -1711,6 +1737,7 @@ function update(dt) {
     return;
   }
   if (S.bump > 0) { S.bump = Math.max(0, S.bump - dt); return; }
+  S.wipe = Math.max(0, S.wipe - dt);
   S.t += dt;
   // The formation sways on the world's own clock, which stops while you are away in the realm, so nothing has jumped when you get back.
   if (!S.realm) S.wt += dt;
@@ -1836,11 +1863,15 @@ function update(dt) {
     else {
       S.nextWave -= dt;
       if (S.nextWave <= 0) {
-        S.wave++;
-        if (S.wave % 3 === 0) spawnBoss();
+        // The challenge stage comes when the wave before a boss is cleared, once.
+        if (S.wave % 3 === 2 && S.dmtWave !== S.wave) { S.dmtWave = S.wave; enterRealm(); }
         else {
-          spawnWave();
-          banner(`Wave ${S.wave}`, WAVE_LINES[(S.wave - 2) % WAVE_LINES.length], C.cyan);
+          S.wave++;
+          if (S.wave % 3 === 0) spawnBoss();
+          else {
+            spawnWave();
+            banner(`Wave ${S.wave}`, WAVE_LINES[(S.wave - 2) % WAVE_LINES.length], C.cyan);
+          }
         }
       }
     }
@@ -1924,7 +1955,7 @@ function drawHUD(g) {
   // The STD list sits in the empty strip under the ship, so nothing is ever printed over the bugs.
   g.font = `17px ${FONT_HUD}`;
   const boosts = [];
-  if (S.realm && S.realm.phase === "fight") boosts.push([`DMT REALM · ${S.realm.killed} of ${REALM.squads * REALM.per} machine elves`, `DMT ${S.realm.killed}/${REALM.squads * REALM.per}`, C.lime]);
+  if (S.realm && S.realm.phase === "fight") boosts.push([`DMT REALM · ${S.realm.killed} of ${REALM.squads * REALM.per}`, `DMT ${S.realm.killed}/${REALM.squads * REALM.per}`, C.lime]);
   if (S.turbo > 0) boosts.push([`NOSE CANDY TURBO ${S.turbo.toFixed(1)}s · ${Math.round(110 + S.turbo * 9)} BPM`, `TURBO ${S.turbo.toFixed(1)}s`, C.pink]);
   else if (S.crash > 0) boosts.push(["THE CRASH · everything is slow", "CRASH", C.dim]);
   if (S.high > 0) boosts.push([`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, `HIGH ${S.high.toFixed(1)}s`, C.lime]);
@@ -1965,10 +1996,25 @@ function drawBanner(g) {
   for (const l of subs) { g.fillText(l, W / 2, y + 2); y += 19; }
   g.globalAlpha = 1;
 }
+// The Waffle House flash: the screen goes yellow for a blink, then three words in black letters on yellow tiles, like the sign.
+function drawWipe(g) {
+  const k = 1 - S.wipe / 0.9, a = Math.min(1, (1 - k) * 4);
+  g.save();
+  if (!reduced && k < 0.25) { g.globalAlpha = 0.6 * (1 - k / 0.25); g.fillStyle = C.gold; g.fillRect(-12, -12, W + 24, H + 24); }
+  g.globalAlpha = a; g.textAlign = "center"; g.textBaseline = "middle"; g.font = `20px ${FONT_SIGN}`;
+  ["SCATTERED", "SMOTHERED", "COVERED"].forEach((word, row) => {
+    const x0 = W / 2 - (word.length * 32 - 2) / 2, y = 120 + row * 36;
+    [...word].forEach((ch, i) => {
+      g.fillStyle = C.gold; g.fillRect(x0 + i * 32, y, 30, 30);
+      g.fillStyle = C.void; g.fillText(ch, x0 + i * 32 + 15, y + 16);
+    });
+  });
+  g.restore();
+}
 // A machine elf: a jester made of triangles that will not hold still.
-function drawElf(g, x, y, t, hue) {
+function drawElf(g, x, y, t, hue, size = 1) {
   const cols = [C.lime, C.pink, C.cyan, C.gold];
-  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 6 + hue) * 0.4);
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 6 + hue) * 0.4); g.scale(size, size);
   g.fillStyle = cols[hue % 4]; g.beginPath(); g.moveTo(0, -12); g.lineTo(11, 7); g.lineTo(-11, 7); g.closePath(); g.fill();
   g.fillStyle = cols[(hue + 1) % 4];
   g.beginPath(); g.moveTo(-10, -6); g.lineTo(-4, -17); g.lineTo(0, -8); g.lineTo(4, -17); g.lineTo(10, -6); g.closePath(); g.fill();
@@ -1980,6 +2026,39 @@ function drawElf(g, x, y, t, hue) {
   g.fillStyle = C.void;
   g.beginPath(); g.arc(-3.5 + look, -1, 1, 0, TAU); g.fill(); g.beginPath(); g.arc(3.5 + look, -1, 1, 0, TAU); g.fill();
   g.strokeStyle = C.void; g.lineWidth = 1.4; g.beginPath(); g.arc(0, 2.5, 4, 0.2, Math.PI - 0.2); g.stroke();
+  // They are machines: each has a wind-up key in its side, turning.
+  g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(9, 2); g.lineTo(14, 2); g.stroke();
+  g.beginPath(); g.ellipse(16, 2, 2.2, 0.6 + 3.2 * Math.abs(Math.cos(t * 8 + hue)), 0, 0, TAU); g.stroke();
+  g.restore();
+}
+// The rest of what flies around in there, as ordered by Jeremy: winged eyes, mushrooms with faces, and pyramids that look back.
+const TRIP = [0, 1, 0, 2, 0, 3, 0, 1];
+function drawTripper(g, x, y, t, hue, kind, size) {
+  if (kind === 0) { drawElf(g, x, y, t, hue, size); return; }
+  const cols = [C.lime, C.pink, C.cyan, C.gold], c = cols[hue % 4];
+  g.save(); g.translate(x, y); g.scale(size, size);
+  if (kind === 1) {
+    const flap = Math.sin(t * 14 + hue) * 5, look = Math.sin(t * 3 + hue) * 2.5;
+    g.fillStyle = c;
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 8, 0); g.lineTo(sx * 19, -6 - flap); g.lineTo(sx * 16, 5); g.closePath(); g.fill(); }
+    g.fillStyle = C.ink; g.beginPath(); g.ellipse(0, 0, 10, 7.5, 0, 0, TAU); g.fill();
+    g.fillStyle = cols[(hue + 2) % 4]; g.beginPath(); g.arc(look, 0, 4.5, 0, TAU); g.fill();
+    g.fillStyle = C.void; g.beginPath(); g.ellipse(look, 0, 1.3, 4, 0, 0, TAU); g.fill();
+  } else if (kind === 2) {
+    g.rotate(Math.sin(t * 4 + hue) * 0.25);
+    g.fillStyle = C.ink; g.fillRect(-4, -1, 8, 11);
+    g.fillStyle = c; g.beginPath(); g.arc(0, -1, 12, Math.PI, 0); g.closePath(); g.fill();
+    g.fillStyle = C.ink;
+    for (const [dx, dy, r] of [[-6, -6, 2.2], [1, -9, 1.8], [6, -4, 2]]) { g.beginPath(); g.arc(dx, dy, r, 0, TAU); g.fill(); }
+    g.fillStyle = C.void; g.fillRect(-2.6, 2, 1.6, 2); g.fillRect(1, 2, 1.6, 2);
+    g.strokeStyle = C.void; g.lineWidth = 1; g.beginPath(); g.arc(0, 5.5, 2.2, 0.2, Math.PI - 0.2); g.stroke();
+  } else {
+    g.rotate(reduced ? 0 : t * 1.5 + hue);
+    g.fillStyle = c; g.beginPath(); g.moveTo(0, -13); g.lineTo(12, 9); g.lineTo(-12, 9); g.closePath(); g.fill();
+    g.strokeStyle = cols[(hue + 1) % 4]; g.lineWidth = 1.6; g.stroke();
+    g.fillStyle = C.ink; g.beginPath(); g.ellipse(0, 2, 5.5, 3.6, 0, 0, TAU); g.fill();
+    g.fillStyle = C.void; g.beginPath(); g.arc(0, 2, 1.8, 0, TAU); g.fill();
+  }
   g.restore();
 }
 function drawPortal(g, x, y, r, t) {
@@ -2024,7 +2103,7 @@ function drawRealm(g) {
   g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
   g.save(); g.translate(cx, 230);
   for (let i = 0; i < 12; i++) {
-    const f = ((i + (reduced ? 0 : t * 0.6)) % 12) / 12, r = 16 + f * 340, sides = 3 + (i % 4), turn = (i % 2 ? 1 : -1) * (reduced ? 0 : t * 0.5) + i;
+    const f = ((i + (reduced ? 0 : t * 0.6)) % 12) / 12, r = (16 + f * 340) * (1 + (reduced ? 0 : 0.07 * Math.sin(t * 2 + i))), sides = 3 + (i % 4), turn = (i % 2 ? 1 : -1) * (reduced ? 0 : t * 0.5) + i;
     g.globalAlpha = 0.08 + 0.3 * (1 - f); g.strokeStyle = cols[i % 4]; g.lineWidth = 1.5 + f * 5;
     g.beginPath();
     for (let j = 0; j <= sides; j++) { const a = (j / sides) * TAU + turn; if (j) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
@@ -2033,7 +2112,7 @@ function drawRealm(g) {
   g.restore(); g.globalAlpha = 1;
   drawMandala(g, cx, 230, 150, t, 0.7);
   drawPortal(g, cx, 230, 13, t);
-  for (const e of R.elves) drawElf(g, e.x, e.y, t, e.hue);
+  for (const e of R.elves) drawTripper(g, e.x, e.y, t, e.hue, TRIP[e.path], 1 + (e.hue % 5 ? 0 : 0.6) + (reduced ? 0 : 0.25 * Math.sin(t * 5 + e.hue)));
   for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + (reduced ? 0 : t * 8))) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, P.x + gx, P.y, t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
   for (const p of S.parts) { g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.color; g.fillRect(p.x, p.y, p.size, p.size); }
@@ -2058,13 +2137,14 @@ function drawBump(g) {
   g.globalAlpha = a;
   const z = reduced ? 1 : 1 + 0.3 * Math.max(0, 1 - k * 6);
   g.translate(W / 2, H / 2 - 30); g.scale(z, z);
-  drawKey(g);
+  const ham = S.bumpKind === "hammered";
+  if (ham) { g.save(); g.scale(4.5, 4.5); drawDrop(g, "beer", 0, -1, 0); g.restore(); } else drawKey(g);
   g.textAlign = "center"; g.textBaseline = "middle";
   g.font = `36px ${FONT_SIGN}`; g.shadowBlur = 18;
-  g.fillStyle = C.cyan; g.shadowColor = C.cyan; g.fillText("KEY BUMP", 0, 78);
-  g.fillStyle = C.pink; g.shadowColor = C.pink; g.fillText("ENGAGED", 0, 118);
+  g.fillStyle = C.cyan; g.shadowColor = C.cyan; g.fillText(ham ? "YOU'RE" : "KEY BUMP", 0, 78);
+  g.fillStyle = C.pink; g.shadowColor = C.pink; g.fillText(ham ? "HAMMERED" : "ENGAGED", 0, 118);
   g.shadowBlur = 0; g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink;
-  g.fillText("Sober as a judge. Paid like a drunk.", 0, 156);
+  g.fillText(ham ? "Find some booger sugar, quick." : "Sober as a judge. Paid like a drunk.", 0, 156);
   g.restore();
 }
 // A ship the choker has taken: it spins up the beam, then rides on his back until somebody shoots him.
@@ -2176,6 +2256,7 @@ function render() {
       ctx.fillStyle = C.pink; ctx.fillText("BLACKOUT", W / 2, H / 2);
       ctx.globalAlpha = 1;
     }
+    if (S.wipe > 0) drawWipe(ctx);
     if (S.bump > 0) drawBump(ctx);
   }
 }
@@ -2281,6 +2362,7 @@ function buildSheet(c) {
       ["Ships stolen / won back", `${st.captured} / ${st.rescued}`],
       ["Key bumps", st.bumps],
       ["Trips to the realm / elves", `${st.trips} / ${st.elves}`],
+      ["Waffle House shifts", st.waffles],
       ["Navy SEAL rescues", st.cody],
       ["Hits taken", tally(st.hitsBy) || "None"],
       ["Finished off by", st.lastHit || "Nothing"],
@@ -2340,7 +2422,7 @@ function start() {
   S = newState(); spawnWave();
   // Shortcuts for testing the bosses: open the page with #boss1 to #boss5 on the end of the link (#bertha still works).
   const skip = /^#boss([1-5])$/.exec(location.hash);
-  if (skip || location.hash === "#bertha") { S.wave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
+  if (skip || location.hash === "#bertha") { S.wave = 2; S.dmtWave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
   if (introSeen) banner("Wave 1", "Guns overheat. Tap Fire to rest them.", C.cyan);
   else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
