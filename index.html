@@ -95,6 +95,16 @@ body.thumb #pad {
 .neon .gold { font-size: 1.5em; color: var(--gold); text-shadow: 0 0 calc(var(--u) * 5) var(--gold), 0 0 calc(var(--u) * 20) var(--gold); }
 .neon .flick { animation: flicker 6s infinite steps(1); }
 @keyframes flicker { 0%, 61%, 64%, 66%, 100% { opacity: 1; } 62%, 65% { opacity: 0.25; } }
+/* The sign girls (as ordered by Jeremy): one each end of the title, a hand on the sign. Each is a tiny canvas,
+   a sprite pixel to a canvas pixel, stretched here with hard edges so it stays blocky on every screen. */
+.sign { position: relative; width: 100%; }
+.sign canvas {
+  position: absolute; top: calc(var(--u) * 2.5); width: calc(var(--u) * 50); height: calc(var(--u) * 102.5);
+  image-rendering: pixelated; pointer-events: none; animation: bob 0.912s infinite steps(1);
+}
+.sign canvas:first-child { left: calc(var(--u) * -14); }
+.sign canvas:last-child { right: calc(var(--u) * -14); animation-delay: -0.456s; }
+@keyframes bob { 50% { transform: translateY(calc(var(--u) * 2.5)); } }
 .tag { font-size: calc(var(--u) * 19); line-height: 1.1; text-wrap: balance; }
 .tag em { font-style: normal; color: var(--gold); }
 .legend {
@@ -216,7 +226,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 #fire.hold[aria-pressed="true"] { color: var(--lime); border-color: var(--lime); }
-@media (prefers-reduced-motion: reduce) { .neon .flick { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .neon .flick, .sign canvas { animation: none; } }
 </style>
 </head>
 <body>
@@ -225,7 +235,11 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   <canvas id="game" aria-label="Spaceballs Deep, a space shooter"></canvas>
 
   <section id="title" class="overlay">
-    <h1 class="neon"><span>Spaceballs</span><br><span class="gold">D<span class="flick">e</span>ep</span></h1>
+    <div class="sign">
+      <canvas data-icon="babeL" aria-hidden="true"></canvas>
+      <h1 class="neon"><span>Spaceballs</span><br><span class="gold">D<span class="flick">e</span>ep</span></h1>
+      <canvas data-icon="babeR" aria-hidden="true"></canvas>
+    </div>
     <p class="tag">Galactic escorts, nose candy and booze.<br><em>As ordered by Jeremy.</em></p>
     <div class="legend">
       <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Bugs</b><span>$1 to $5 a pop</span></div></div>
@@ -289,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v26</span>
+  <span id="ver">v27</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -383,6 +397,7 @@ const sfx = {
   warn: () => { tone(660, 0.1, "square", 0.03); tone(660, 0.1, "square", 0.03, 0, 0.16); },
   crash: () => tone(400, 0.8, "sine", 0.06, 90),
   broke: () => { tone(300, 0.25, "square", 0.04, 0, 0); tone(200, 0.4, "square", 0.04, 0, 0.22); },
+  laugh: () => { for (let i = 0; i < 8; i++) tone(i % 2 ? 175 : 233, 0.12, "sawtooth", 0.045, i % 2 ? 140 : 185, i * 0.16); },
   eshot: () => tone(260, 0.1, "sawtooth", 0.03, 120),
   crow: () => { tone(520, 0.08, "sawtooth", 0.035, 0, 0); tone(700, 0.08, "sawtooth", 0.035, 0, 0.09); tone(620, 0.08, "sawtooth", 0.035, 0, 0.18); tone(880, 0.35, "sawtooth", 0.035, 440, 0.27); },
   tweet: () => { tone(2400, 0.05, "sine", 0.03, 3100); tone(2700, 0.05, "sine", 0.03, 3300, 0.08); },
@@ -948,9 +963,70 @@ function drawEnemyShot(g, e, t) {
   }
   g.restore();
 }
+// The sign girls: one sprite, a letter a pixel. H/h hair, S/s skin, B/b bikini, E eyes, M lips, G bangle, P heels.
+// The one on the right is the same sprite mirrored, in her own colours.
+const BABE = [
+  "......HHHHH.........",
+  "....HHHHHHHHH.......",
+  "...HHhhHHHHHHH......",
+  "...HHHHHHHHHHH..SS..",
+  "...HHHSSSSSHHH.SSS..",
+  "...HHSESSSESHH.SSS..",
+  "...HHSESSSESHH.GG...",
+  "...HHSSMMMSSHH.SS...",
+  "...HHHSSSSSHHH.SS...",
+  "..HHHHhSSShHHH.SS...",
+  "..HHHhhSSShhHHSS....",
+  "..HHSSBSSSBSSSS.....",
+  ".SSSSBSSSSSBSSs.....",
+  "SS.BBBBSsSBBBB......",
+  "SSBBBbBBsBBbBBB.....",
+  "SSBBBBBBsBBBBBB.....",
+  "SS.BBBBBSBBBBB......",
+  "SS..ssssSssss.......",
+  ".SS..SSSSSSS........",
+  "..SS..SSSSS.........",
+  "...SS.SSsSS.........",
+  "...SSSSSSSSS........",
+  "....BBBBBBBBB.......",
+  "....SBBBBBBBS.......",
+  "....SSBBBBBSS.......",
+  "....SSSBBBSSS.......",
+  "....SSSSsSSSS.......",
+  "....SSSS.SSSS.......",
+  "....SSSS.SSSS.......",
+  ".....SSS.SSS........",
+  ".....SSS.SSS........",
+  ".....SSS.SSS........",
+  ".....SSs.sSS........",
+  ".....SSS.SSS........",
+  "......SS.SS.........",
+  "......SS.SS.........",
+  "......SS.SS.........",
+  "......SS.SS.........",
+  "......SS.SS.........",
+  ".....PPP.PPP........",
+  "....PPPP.PPPP.......",
+];
+const BABE_INK = {
+  babeL: { H: C.gold, h: "#d9961c", S: C.skin, s: "#cf8a63", B: C.pink, b: "#ff9fd0", E: "#241038", M: "#e0245e", G: C.cyan, P: C.pink },
+  babeR: { H: C.violet, h: "#7a5cd6", S: "#b9744a", s: C.brown, B: C.cyan, b: "#d4fbff", E: "#241038", M: "#ff7ab8", G: C.gold, P: C.cyan },
+};
+function drawBabe(c, k) {
+  const w = BABE[0].length, h = BABE.length, ink = BABE_INK[k], flip = k === "babeR";
+  c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const px = BABE[y][x];
+    if (px === ".") continue;
+    g.fillStyle = ink[px]; g.fillRect(flip ? w - 1 - x : x, y, 1, 1);
+  }
+}
 function drawIcons() {
   document.querySelectorAll("canvas[data-icon]").forEach((c) => {
     const k = c.dataset.icon, r = c.getBoundingClientRect();
+    if (BABE_INK[k]) { drawBabe(c, k); return; }
     const s = Math.max(1, r.width / 30) * (window.devicePixelRatio || 1);
     c.width = Math.round(30 * s); c.height = Math.round(30 * s);
     const g = c.getContext("2d");
@@ -1032,7 +1108,7 @@ function playStep(mode, i, t) {
   if (s === 4 || s === 12) drum(t, 0.09, LOUD.snare, 1800);
 }
 function musicTick() {
-  if (!actx || muted || paused || asking || actx.state !== "running" || !S || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
+  if (!actx || muted || paused || asking || actx.state !== "running" || !S || S.mug || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
   const now = actx.currentTime, mode = S.realm ? "realm" : S.boss ? "boss" : "wave";
   // Picking up after a pause, a mute or a new game: start a beat from now rather than racing to catch up.
   if (!music.next || music.next < now) music.next = now + 0.06;
@@ -1099,7 +1175,7 @@ function newState() {
     mode: "play", t: 0, wt: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, mug: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1109,7 +1185,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0, robbed: 0, robbedCents: 0,
     },
   };
 }
@@ -1512,6 +1588,26 @@ function hurt(title, sub) {
   if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; S.realm = null; input.touchFire = false; }
 }
 
+// ---------- the mugging: a prank, by order of Stephen, who says it is coming out again later ----------
+// The first time a game's cash reaches $1,000 the lights go out, Gangster Scuba Steve swims up, smacks the ship,
+// takes every cent, laughs about it and swims off. Nothing else is lost, and the game carries on from where it stopped.
+// It happens once a game. To switch the whole thing off, set PRANK to false.
+const PRANK = true;
+const MUG = { at: 100000, smack: 1.7, take: 2.1, laugh: 3.4, leave: 4.8, len: 5.5 };
+function mugTick(dt) {
+  const M = S.mug, was = M.t;
+  M.t += dt;
+  S.shake = Math.max(0, S.shake - dt);
+  const now = (k) => was < MUG[k] && M.t >= MUG[k];
+  if (now("smack")) { S.shake = 0.6; sfx.hurt(); }
+  if (now("take")) { M.took = Math.max(0, S.cents); S.cents -= M.took; S.stats.robbedCents += M.took; sfx.broke(); }
+  if (now("laugh")) sfx.laugh();
+  if (M.t >= MUG.len) {
+    S.mug = null; S.player.inv = Math.max(S.player.inv, 2);
+    banner("Robbed", `Gangster Scuba Steve took all ${money(M.took)} of it. Carry on.`, C.red);
+  }
+}
+
 // ---------- Waffle House employee training, as ordered by Jeremy: like the lightning in 1942, it clears the screen ----------
 const WILD = 7;
 const wildness = () => S.ebullets.length + 2 * S.bugs.filter((o) => !o.dead && (o.state === "dive" || o.state === "beam" || o.state === "beamIn")).length;
@@ -1887,6 +1983,11 @@ function update(dt) {
     return;
   }
   if (S.bump > 0) { S.bump = Math.max(0, S.bump - dt); return; }
+  // The mugging stops the world the same way, for longer. It waits for a blackout or a trip to finish first.
+  if (S.mug) { mugTick(dt); return; }
+  if (PRANK && !S.stats.robbed && S.mode === "play" && S.cents >= MUG.at && !S.realm && S.blackout <= 0) {
+    S.stats.robbed = 1; S.mug = { t: 0, took: 0 }; S.bullets = [];
+  }
   S.wipe = Math.max(0, S.wipe - dt);
   S.t += dt;
   // The formation sways on the world's own clock, which stops while you are away in the realm, so nothing has jumped when you get back.
@@ -2466,6 +2567,119 @@ function drawRealm(g) {
   for (const p of S.parts) { g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.color; g.fillRect(p.x, p.y, p.size, p.size); }
   g.globalAlpha = 1;
 }
+// Gangster Scuba Steve: wetsuit, tank, mask and flippers; red bandana, gold chain with a dollar sign on it, rings.
+// slap runs 0 to 1 through the wind-up and the swing, laugh is how hard he is laughing, loot is how full the sack is.
+function drawSteve(g, x, y, t, slap, laugh, loot) {
+  g.save(); g.translate(x, y + Math.sin(t * 24) * 3 * laugh); g.scale(1.5, 1.5);
+  g.lineCap = "round"; g.lineJoin = "round";
+  // The tank on his back and the hose round to his mouth.
+  g.fillStyle = C.dim; g.fillRect(-27, -28, 13, 44);
+  g.fillStyle = C.gold; g.fillRect(-24, -33, 7, 6);
+  g.strokeStyle = C.void; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-27, -12); g.lineTo(-14, -12); g.moveTo(-27, 2); g.lineTo(-14, 2); g.stroke();
+  g.strokeStyle = C.dim; g.lineWidth = 3; g.beginPath(); g.moveTo(-20, -30); g.quadraticCurveTo(-22, -52, -4, -30); g.stroke();
+  // Legs and flippers.
+  const kick = Math.sin(t * 5) * 4;
+  g.strokeStyle = C.navy; g.lineWidth = 11;
+  g.beginPath(); g.moveTo(-8, 18); g.lineTo(-11 - kick, 42); g.moveTo(8, 18); g.lineTo(11 + kick, 42); g.stroke();
+  g.fillStyle = C.gold;
+  g.beginPath(); g.moveTo(-15 - kick, 40); g.lineTo(-34 - kick, 62); g.lineTo(-6 - kick, 60); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(15 + kick, 40); g.lineTo(34 + kick, 62); g.lineTo(6 + kick, 60); g.closePath(); g.fill();
+  // The arm with the sack in it, behind the body.
+  g.strokeStyle = C.navy; g.lineWidth = 9; g.beginPath(); g.moveTo(15, -12); g.lineTo(31, 6); g.stroke();
+  if (loot > 0) {
+    const r = 7 + loot * 11;
+    g.fillStyle = C.brown; g.beginPath(); g.arc(34, 8 + r * 0.6, r, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(30, 6); g.lineTo(38, 6); g.lineTo(36, 12); g.lineTo(32, 12); g.closePath(); g.fill();
+    g.fillStyle = C.gold; g.font = `${Math.round(r * 1.1)}px ${FONT_SIGN}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("$", 34, 9 + r * 0.6);
+  }
+  g.fillStyle = C.skin; g.beginPath(); g.arc(31, 6, 5, 0, TAU); g.fill();
+  // The wetsuit, with a stripe down each side.
+  g.fillStyle = C.navy; g.beginPath(); g.ellipse(0, -1, 18, 26, 0, 0, TAU); g.fill();
+  g.strokeStyle = C.cyan; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(-13, -16); g.quadraticCurveTo(-17, 0, -11, 18); g.moveTo(13, -16); g.quadraticCurveTo(17, 0, 11, 18); g.stroke();
+  // The chain.
+  g.strokeStyle = C.gold; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(-10, -20); g.quadraticCurveTo(0, 4, 10, -20); g.stroke();
+  g.fillStyle = C.gold; g.beginPath(); g.arc(0, -3 + Math.sin(t * 6) * 1.5 * (0.3 + laugh), 6.5, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.font = `9px ${FONT_SIGN}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("$", 0, -2.5 + Math.sin(t * 6) * 1.5 * (0.3 + laugh));
+  // The slapping arm: it hangs, winds up over his shoulder, then comes across.
+  const wind = clamp(slap * 2, 0, 1), swing = clamp(slap * 2 - 1, 0, 1);
+  const hx = -30 + wind * 4 - swing * 26, hy = 8 - wind * 52 + swing * 44;
+  g.strokeStyle = C.navy; g.lineWidth = 9; g.beginPath(); g.moveTo(-15, -12); g.lineTo(hx, hy); g.stroke();
+  g.fillStyle = C.skin; g.beginPath(); g.arc(hx, hy, 6.5, 0, TAU); g.fill();
+  g.fillStyle = C.gold; g.fillRect(hx - 4, hy - 1.5, 3, 3); g.fillRect(hx + 1, hy - 1.5, 3, 3);
+  // The head: bandana, mask, mouthpiece. It goes back when he laughs.
+  g.translate(0, -24); g.rotate(-0.28 * laugh); g.translate(0, 24);
+  g.fillStyle = C.navy; g.beginPath(); g.arc(0, -40, 15.5, 0, TAU); g.fill();
+  g.fillStyle = C.skin; g.beginPath(); g.arc(0, -39, 12.5, 0, TAU); g.fill();
+  g.fillStyle = C.red; g.fillRect(-14.5, -53, 29, 6.5);
+  g.beginPath(); g.moveTo(14, -52); g.lineTo(23, -57); g.lineTo(21, -49); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(14, -49); g.lineTo(24, -47); g.lineTo(18, -43); g.closePath(); g.fill();
+  g.fillStyle = C.void; g.fillRect(-13.5, -46.5, 27, 12);
+  g.fillStyle = C.cyan; g.fillRect(-11.5, -44.5, 10.5, 8); g.fillRect(1, -44.5, 10.5, 8);
+  g.strokeStyle = C.void; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(-10.5, -43.5); g.lineTo(-3, -40.5); g.moveTo(10.5, -43.5); g.lineTo(3, -40.5); g.stroke();
+  g.fillStyle = C.ink; g.globalAlpha = 0.7; g.fillRect(-10, -43.5, 2, 3); g.fillRect(2.5, -43.5, 2, 3); g.globalAlpha = 1;
+  g.fillStyle = C.dim; g.beginPath(); g.arc(0, -30.5, 5, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(0, -30.5, 2, 0, TAU); g.fill();
+  // Bubbles, and a lot more of them when he laughs.
+  g.strokeStyle = C.cyan; g.lineWidth = 1.2;
+  for (let i = 0; i < 4 + Math.round(laugh * 5); i++) {
+    const f = (t * (0.8 + laugh * 0.9) + i * 0.23) % 1;
+    g.globalAlpha = 1 - f; g.beginPath(); g.arc(4 + Math.sin(i * 2.1 + t * 3) * (5 + i * 2), -36 - f * 44, 1.5 + f * 3, 0, TAU); g.stroke();
+  }
+  g.globalAlpha = 1;
+  g.restore();
+}
+// The whole scene, drawn over everything while the world is stopped.
+function drawMug(g) {
+  const M = S.mug, t = M.t, P = S.player;
+  const dark = Math.min(clamp(t / 0.45, 0, 1), clamp((MUG.len - t) / 0.45, 0, 1));
+  g.save();
+  g.globalAlpha = dark; g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
+  // He comes up from the deep, hangs there while he works, and leaves over the top.
+  const up = ease(clamp((t - 0.4) / 0.9, 0, 1)), off = ease(clamp((t - MUG.leave) / 0.6, 0, 1));
+  const sx = 214, sy = 760 - up * 470 - off * 520 + (reduced ? 0 : Math.sin(t * 2.4) * 5);
+  const slap = clamp((t - (MUG.smack - 0.55)) / 0.6, 0, 1) * (t < MUG.take ? 1 : clamp(1 - (t - MUG.take) / 0.3, 0, 1));
+  const laugh = clamp((t - MUG.laugh) / 0.25, 0, 1) * clamp((MUG.leave - t) / 0.25, 0, 1);
+  const loot = clamp((t - MUG.take) / 1, 0, 1);
+  // Your ship is hauled in front of him, takes the slap, and is put back when he goes.
+  const held = ease(clamp((t - 0.5) / 0.8, 0, 1)) * (1 - off), hit = clamp((t - MUG.smack) / 0.5, 0, 1);
+  const jolt = t >= MUG.smack ? Math.sin(hit * Math.PI) : 0;
+  const px = P.x + (104 - P.x) * held - jolt * 34, py = P.y + (318 - P.y) * held - jolt * 10;
+  g.globalAlpha = dark;
+  g.save(); g.translate(px, py); g.rotate(t >= MUG.smack && !reduced ? -(1 - hit) * 7 : 0);
+  for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, gx, 0, t, false, false);
+  g.restore();
+  drawSteve(g, sx, sy, t, slap, laugh, loot);
+  // The money goes across to him a coin at a time.
+  g.fillStyle = C.gold;
+  for (let i = 0; i < 12; i++) {
+    const k = clamp((t - MUG.take - i * 0.07) / 0.5, 0, 1);
+    if (k <= 0 || k >= 1) continue;
+    g.beginPath(); g.arc(px + (sx + 50 - px) * k, py + (sy + 18 - py) * k - Math.sin(k * Math.PI) * 46, 4, 0, TAU); g.fill();
+  }
+  // What it says while it happens.
+  g.textAlign = "center"; g.textBaseline = "middle";
+  const said = (text, x, y, size, color, from, to) => {
+    const a = Math.min(clamp((t - from) / 0.15, 0, 1), clamp((to - t) / 0.15, 0, 1));
+    if (a <= 0) return;
+    g.globalAlpha = a * dark; g.font = `${size}px ${FONT_SIGN}`; g.fillStyle = color; g.shadowColor = color; g.shadowBlur = 14;
+    g.fillText(text, x, y); g.shadowBlur = 0;
+  };
+  said("GANGSTER", W / 2, 96, 24, C.pink, 0.9, MUG.leave);
+  said("SCUBA STEVE", W / 2, 128, 32, C.cyan, 0.9, MUG.leave);
+  said("SMACK!", 96, 250 - (reduced ? 0 : hit * 14), 34, C.red, MUG.smack, MUG.take + 0.2);
+  said("RUN THEM POCKETS", W / 2, 470, 22, C.gold, MUG.take, MUG.laugh);
+  said("HA HA HA HA", W / 2, 470 + (reduced ? 0 : Math.sin(t * 20) * 4), 30, C.gold, MUG.laugh, MUG.leave);
+  said("APPRECIATE YOU", W / 2, 470, 22, C.cyan, MUG.leave, MUG.len);
+  // Your cash, counting down to nothing.
+  const left = t < MUG.take ? S.cents : Math.round(M.took * (1 - clamp((t - MUG.take) / 1, 0, 1)));
+  g.globalAlpha = dark * clamp((t - 0.9) / 0.2, 0, 1);
+  g.font = `13px ${FONT_SIGN}`; g.fillStyle = C.dim; g.fillText("YOUR CASH", W / 2, 520);
+  g.font = `44px ${FONT_HUD}`; g.fillStyle = left > 0 ? C.gold : C.red; g.fillText(money(left), W / 2, 552);
+  g.restore();
+}
 // The key bump card: a key with a little pile on the end of it, as specified.
 function drawKey(g) {
   g.save(); g.rotate(-0.6);
@@ -2606,6 +2820,7 @@ function render() {
     }
     if (S.wipe > 0) drawWipe(ctx);
     if (S.bump > 0) drawBump(ctx);
+    if (S.mug) drawMug(ctx);
   }
 }
 
@@ -2727,6 +2942,7 @@ function buildSheet(c) {
       ...cost("Clinic co-pays", st.clinics * 2000),
       ...cost("Munchies", st.munchCents),
       ...cost("Her half", st.papersCents),
+      ...cost("Robbed by Scuba Steve", st.robbedCents),
       ["Final take", money(c)],
     ]],
   ];
