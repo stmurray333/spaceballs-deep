@@ -42,9 +42,18 @@ body {
   padding-block: 10px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  touch-action: manipulation;
+  touch-action: none;
+}
+/* On a phone the game docks to the top and this pad fills the space under it, so the thumb that steers
+   never has to sit on top of the ship. A drag anywhere on the screen works, the pad included. */
+#pad { display: none; }
+body.thumb { justify-content: flex-start; }
+body.thumb #pad {
+  display: flex; flex: 1 1 0; min-height: 0; align-self: stretch; align-items: center; justify-content: center;
+  box-sizing: border-box; padding: 6px 12px; border: 1px dashed var(--deep); border-radius: 14px;
+  color: var(--dim); font-size: 17px; line-height: 1.15; text-align: center; touch-action: none;
 }
 #stage {
   --u: 1px;
@@ -58,7 +67,7 @@ body {
   display: flex; flex-direction: column; align-items: center;
   gap: calc(var(--u) * 12);
   padding: calc(var(--u) * 22) calc(var(--u) * 20);
-  text-align: center; background: var(--scrim); overflow-x: hidden; overflow-y: auto;
+  text-align: center; background: var(--scrim); overflow-x: hidden; overflow-y: auto; touch-action: pan-y;
 }
 .overlay p { margin: 0; }
 /* Auto margins center the stack when it fits and let it scroll from the top when it doesn't. */
@@ -113,16 +122,22 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   font-variant-numeric: tabular-nums; text-shadow: 0 0 calc(var(--u) * 14) var(--gold-glow);
 }
 .cash.debt { color: var(--red); }
-#stats {
+#stats, .rows {
   display: grid; grid-template-columns: 1fr auto; margin: 0;
   gap: calc(var(--u) * 3) calc(var(--u) * 14);
   width: 100%; max-width: calc(var(--u) * 270); font-size: calc(var(--u) * 17); line-height: 1;
 }
-#stats dt { color: var(--dim); text-align: left; }
-#stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+#stats dt, .rows dt { color: var(--dim); text-align: left; }
+#stats dd, .rows dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 #best { font-size: calc(var(--u) * 17); color: var(--gold); }
-/* The end screen keeps clear of the sound button in the bottom corner, however many rows the run earned. */
+/* The end screen and the rap sheet keep clear of the sound button in the bottom corner. */
 #over { gap: calc(var(--u) * 7); padding-bottom: calc(var(--u) * 36); }
+#sheet { gap: calc(var(--u) * 10); padding-bottom: calc(var(--u) * 40); }
+#sheetBody { display: grid; gap: calc(var(--u) * 12); width: 100%; max-width: calc(var(--u) * 290); }
+#sheetBody h3 { margin: 0 0 calc(var(--u) * 5); font-weight: 400; text-align: left; color: var(--pink); }
+/* On the rap sheet the label keeps its line and a long value wraps, so one long list can't squeeze every label. */
+#sheetBody .rows { max-width: none; font-size: calc(var(--u) * 16); grid-template-columns: auto minmax(0, 1fr); line-height: 1.1; }
+#sheetBody .rows dt { white-space: nowrap; }
 .big { white-space: nowrap; }
 #over .big { font-size: calc(var(--u) * 18); padding: calc(var(--u) * 9) calc(var(--u) * 20); }
 .row { display: flex; gap: calc(var(--u) * 10); align-items: center; justify-content: center; }
@@ -146,7 +161,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 }
 .post input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 #postStatus { font-size: calc(var(--u) * 15); line-height: 1.1; color: var(--dim); min-height: 1.1em; text-align: left; }
-#board h2 {
+#board h2, #sheet h2 {
   font-family: var(--font-neon); font-weight: 400; margin: 0;
   font-size: calc(var(--u) * 34); color: var(--gold);
   text-shadow: 0 0 calc(var(--u) * 5) var(--gold), 0 0 calc(var(--u) * 18) var(--gold);
@@ -227,8 +242,18 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     </form>
     <div class="row">
       <button id="again" class="big" type="button">Play again</button>
+    </div>
+    <div class="row">
+      <button id="overSheet" class="ghost" type="button">Rap sheet</button>
       <button id="overBoard" class="ghost" type="button">Leaderboard</button>
     </div>
+  </section>
+
+  <section id="sheet" class="overlay" hidden>
+    <p class="eyebrow">Stats, as ordered by Chandler</p>
+    <h2>Rap sheet</h2>
+    <button id="sheetBack" class="ghost" type="button">Back</button>
+    <div id="sheetBody"></div>
   </section>
 
   <section id="board" class="overlay" hidden>
@@ -239,9 +264,10 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v9</span>
+  <span id="ver">v10</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
+<div id="pad" aria-hidden="true">Thumb goes down here.<br>Drag anywhere to fly and shoot.</div>
 
 <script>
 (() => {
@@ -333,10 +359,15 @@ const sfx = {
 
 // ---------- sizing ----------
 let scale = 1, dpr = 1;
+const coarse = matchMedia("(pointer: coarse)");
+let touched = false;
 function fit() {
   const bs = getComputedStyle(document.body);
+  // A touch screen held upright gets the thumb pad: at least PAD pixels under the game, more if the phone is tall.
+  const PAD = 104, thumb = (coarse.matches || touched) && document.body.clientHeight > document.body.clientWidth;
+  document.body.classList.toggle("thumb", thumb);
   const aw = document.body.clientWidth - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight);
-  const ah = document.body.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
+  const ah = document.body.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom) - (thumb ? PAD : 0);
   const w = Math.max(220, Math.floor(Math.min(aw, ah * W / H)));
   const h = Math.floor(w * H / W);
   stage.style.width = w + "px"; stage.style.height = h + "px";
@@ -711,6 +742,8 @@ function drawSearchlight(g, f) {
 }
 function drawEnemyShot(g, e, t) {
   g.save(); g.translate(e.x, e.y);
+  // Each shot keeps the phase it was born with, so it spins and wobbles smoothly as it travels.
+  const ph = e.ph === undefined ? (e.ph = e.x) : e.ph;
   if (e.kind === "egg") {
     g.shadowColor = C.red; g.shadowBlur = 8;
     g.fillStyle = C.ink; g.beginPath(); g.ellipse(0, 0, 5, 6.5, 0, 0, TAU); g.fill();
@@ -723,8 +756,8 @@ function drawEnemyShot(g, e, t) {
     g.shadowBlur = 0; g.strokeStyle = C.ink; g.lineWidth = 1;
     g.beginPath(); g.moveTo(-7, 1); g.quadraticCurveTo(0, 3, 7, 1); g.stroke();
   } else if (e.kind === "slap") {
-    g.rotate(Math.sin(t * 9 + e.x) * 0.3);
-    g.shadowColor = C.gold; g.shadowBlur = 8; g.fillStyle = C.skin;
+    g.rotate(Math.sin(t * 9 + ph) * 0.3);
+    g.shadowColor = C.red; g.shadowBlur = 10; g.fillStyle = C.skin;
     g.beginPath(); g.ellipse(0, 2, 8, 7, 0, 0, TAU); g.fill();
     g.shadowBlur = 0;
     for (const fx of [-6, -2, 2, 6]) g.fillRect(fx - 1.6, -11, 3.2, 9);
@@ -732,23 +765,29 @@ function drawEnemyShot(g, e, t) {
     g.fillStyle = C.gold; g.fillRect(-3.6, -5, 3.2, 2.2);
   } else if (e.kind === "coin") {
     g.shadowColor = C.gold; g.shadowBlur = 8; g.fillStyle = C.gold;
-    g.beginPath(); g.ellipse(0, 0, 5 * Math.abs(Math.cos(t * 6 + e.x)) + 1.8, 6.5, 0, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(0, 0, 5 * Math.abs(Math.cos(t * 6 + ph)) + 1.8, 6.5, 0, 0, TAU); g.fill();
     g.shadowBlur = 0; g.strokeStyle = C.red; g.lineWidth = 1.2; g.stroke();
   } else if (e.kind === "ticket" || e.kind === "papers") {
-    g.rotate(Math.sin(t * 7 + e.x) * 0.35);
-    g.shadowColor = C.red; g.shadowBlur = 8; g.fillStyle = C.ink; g.fillRect(-6, -7.5, 12, 15);
-    g.shadowBlur = 0;
-    g.fillStyle = C.dim; g.fillRect(-4, -3.5, 8, 1.2); g.fillRect(-4, -0.5, 8, 1.2);
-    g.fillStyle = C.red;
-    if (e.kind === "ticket") g.fillRect(-6, -7.5, 12, 2.5);
-    else { g.font = `6px ${FONT_SIGN}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("1/2", 0, 4.5); }
+    // Paper that is out to get you is never white, so it can't be mistaken for a bag of nose candy:
+    // tickets are yellow slips, divorce papers are red, and both trail red like every other enemy shot.
+    const d = Math.hypot(e.vx, e.vy) || 1, papers = e.kind === "papers";
+    g.strokeStyle = C.red; g.lineWidth = 4; g.lineCap = "round"; g.globalAlpha = 0.55;
+    g.beginPath(); g.moveTo(-e.vx / d * 18, -e.vy / d * 18); g.lineTo(0, 0); g.stroke();
+    g.globalAlpha = 1;
+    g.rotate(Math.sin(t * 7 + ph) * 0.35);
+    g.shadowColor = C.red; g.shadowBlur = 10; g.fillStyle = papers ? C.red : C.gold; g.fillRect(-6, -7.5, 12, 15);
+    g.shadowBlur = 0; g.strokeStyle = papers ? C.ink : C.red; g.lineWidth = 1.2; g.strokeRect(-6, -7.5, 12, 15);
+    g.fillStyle = papers ? C.ink : C.void; g.fillRect(-4, -4.5, 8, 1.2); g.fillRect(-4, -1.5, 8, 1.2);
+    if (papers) { g.font = `7px ${FONT_SIGN}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("1/2", 0, 3.5); }
+    else g.fillRect(-4, 1.5, 5, 1.2);
   } else if (e.kind === "donut") {
-    g.shadowColor = C.pink; g.shadowBlur = 8; g.strokeStyle = C.pink; g.lineWidth = 5;
+    g.shadowColor = C.red; g.shadowBlur = 10; g.strokeStyle = C.pink; g.lineWidth = 5;
     g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.stroke();
+    g.strokeStyle = C.red; g.lineWidth = 1.2; g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.stroke();
     g.shadowBlur = 0; g.fillStyle = C.ink;
     for (let i = 0; i < 5; i++) g.fillRect(Math.cos(i * 1.3 + 0.4) * 6 - 0.9, Math.sin(i * 1.3 + 0.4) * 6 - 0.9, 1.8, 1.8);
   } else if (e.kind === "pan") {
-    g.rotate(t * 9 + e.x);
+    g.rotate(t * 9 + ph);
     g.shadowColor = C.red; g.shadowBlur = 8; g.fillStyle = C.dim;
     g.beginPath(); g.arc(0, 0, 7.5, 0, TAU); g.fill();
     g.shadowBlur = 0; g.fillRect(6.5, -1.6, 9, 3.2);
@@ -844,6 +883,8 @@ function newState() {
     stats: {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
+      peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0,
     },
   };
 }
@@ -974,13 +1015,13 @@ function hitFlyer(f) {
   if (f.hp > 0) { sfx.tink(); return; }
   f.dead = true;
   if (f.kind === "keg") {
-    S.cents += 500;
+    S.cents += 500; S.stats.earned += 500;
     pop("Party foul. +$5.00", f.x, f.y, C.gold, 17);
     burst(f.x, f.y, C.ink, 22); burst(f.x, f.y, C.gold, 10); sfx.pop();
     return;
   }
   const rooster = f.kind === "rooster", v = (rooster ? 1000 : 300) * payMult();
-  S.cents += v;
+  S.cents += v; S.stats.earned += v;
   if (rooster) S.stats.cocks++; else S.stats.tits++;
   pop("+" + money(v), f.x, f.y, C.gold, rooster ? 20 : 15);
   burst(f.x, f.y, rooster ? C.ink : C.gold, rooster ? 26 : 10);
@@ -1031,7 +1072,7 @@ function bossAttack(B) {
     else spawnFlyby("rooster");
   } else if (B.key === "pimp") {
     if (kind === 0) seekers({ kind: "slap" }, mad ? [-44, 0, 44] : [-30, 30]);
-    else if (kind === 1) row({ kind: "coin" }, mad ? 175 : 150);
+    else if (kind === 1) row({ kind: "coin" }, mad && S.crash <= 0 ? 175 : 150);
     else seekers({ kind: "kiss", who: "pimp" }, mad ? [-40, 0, 40] : [-28, 28]);
   } else if (B.key === "sheriff") {
     if (kind === 0) fan({ kind: "ticket" }, mad ? 7 : 5, 0.22, sp - 15);
@@ -1085,7 +1126,7 @@ function hitBoss(B) {
 }
 function finishBoss(B) {
   burst(B.x, B.y, C.pink, 40); burst(B.x, B.y, C.gold, 30);
-  S.cents += 5000; S.stats.bosses++;
+  S.cents += 5000; S.stats.earned += 5000; S.stats.bosses++;
   pop("+$50.00", B.x, B.y, C.gold, 26);
   S.boss = null;
   let sub = BOSSES[B.key].down[1];
@@ -1093,7 +1134,7 @@ function finishBoss(B) {
   else if (B.key === "sheriff") {
     const back = (S.stats.duis - S.refunded) * 5000;
     S.refunded = S.stats.duis;
-    if (back) { S.cents += back; pop(`DUI refund +${money(back)}`, B.x, B.y + 28, C.cyan, 18); }
+    if (back) { S.cents += back; S.stats.refundCents += back; pop(`DUI refund +${money(back)}`, B.x, B.y + 28, C.cyan, 18); }
     else sub = "Charges dropped. Your record was clean anyway.";
   } else if (S.lives < 5) S.lives++;
   else sub = "You're on the couch tonight.";
@@ -1105,12 +1146,13 @@ function shotHit(e) {
   const P = S.player, k = e.kind;
   if (k === "papers") {
     const half = clamp(Math.floor(S.cents / 2), 0, 25000);
-    S.cents -= half; P.inv = Math.max(P.inv, 1.2); S.shake = 0.3; sfx.broke();
-    banner("Divorce papers", half ? `She gets half. That's ${money(half)}.` : "She gets half of nothing.", C.red);
+    S.cents -= half; S.stats.papers++; S.stats.papersCents += half;
+    P.inv = Math.max(P.inv, 1.2); S.shake = 0.3; sfx.broke();
+    banner("Divorce papers", !half ? "She gets half of nothing." : half < 25000 ? `She gets half. That's ${money(half)}.` : `Her lawyer settled for ${money(half)}.`, C.red);
     return;
   }
-  if (k === "slap") S.cents -= 2000;
-  if (k === "ticket") S.cents -= 1500;
+  if (k === "slap") { S.cents -= 2000; S.stats.slaps++; }
+  if (k === "ticket") { S.cents -= 1500; S.stats.tickets++; }
   const line = {
     kiss: ["Kiss of death", e.who === "pimp" ? "One of his girls got you." : "Bertha got you. Lipstick everywhere."],
     egg: ["Egged", "Taken out by a huge cock. Tell no one."],
@@ -1129,7 +1171,7 @@ function hitBug(b) {
   if (S.beamer === b) S.beamer = null;
   const diving = b.state !== "form" && b.state !== "enter";
   const v = VALUE[b.type] * (diving ? 2 : 1) * payMult();
-  S.cents += v; S.stats.kills++;
+  S.cents += v; S.stats.earned += v; S.stats.kills++;
   pop("+" + money(v), b.x, b.y, diving ? C.gold : C.ink, diving ? 18 : 15);
   burst(b.x, b.y, b.type === "drone" ? C.lime : b.type === "hornet" ? C.pink : C.gold, 14);
   sfx.pop();
@@ -1179,6 +1221,7 @@ function collect(kind) {
 function hurt(title, sub) {
   const P = S.player;
   if (P.inv > 0 || S.mode !== "play") return;
+  S.stats.hitsBy[title] = (S.stats.hitsBy[title] || 0) + 1; S.stats.lastHit = title;
   S.lives--; P.inv = 2.2; S.shake = 0.5;
   burst(P.x, P.y, C.gold, 26); sfx.hurt();
   banner(title, sub, C.red);
@@ -1208,6 +1251,7 @@ function wobble() {
 function drink() {
   const P = S.player;
   S.stats.beers++; S.drinks += 1; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
+  S.stats.peakBac = Math.max(S.stats.peakBac, bac());
   pop(`*GLUG* pay x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
   if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more when you're drunk. Your aim does not improve.", C.gold); }
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
@@ -1228,13 +1272,13 @@ function afterEscort(E) {
   const open = Object.keys(STD).filter((k) => !S.std[k]);
   if (!open.length) return;
   if (S.rubbers > 0 && !drunk) {
-    S.rubbers--;
+    S.rubbers--; S.stats.rubbersUsed++;
     pop(open.length < 3 ? "Wrapped it. Nothing new." : "Wrapped it. You're clean.", P.x, P.y - 52, C.lime, 16);
     return;
   }
   if (Math.random() >= (drunk ? 1 : E.free ? 0.4 : 0.65)) return;
   const k = pick(open), [name, title, sub] = STD[k];
-  S.std[k] = true;
+  S.std[k] = true; S.stats.stdHits[k]++;
   if (!S.stats.stds.includes(name)) S.stats.stds.push(name);
   if (k === "herpes") { S.flare = 0; S.flareCd = 5; S.dormant = 0; }
   // A banner that only just went up (the DUI that scared her off, say) keeps the stage; this rides along as a pop.
@@ -1244,7 +1288,7 @@ function afterEscort(E) {
 }
 function clinic() {
   const had = sick();
-  S.cents -= 2000; S.std.clap = S.std.crabs = false;
+  S.cents -= 2000; S.stats.clinics++; S.std.clap = S.std.crabs = false;
   if (S.std.herpes) { S.dormant = 45; S.flare = 0; }
   const news = !had ? "Nothing wrong with you." : S.std.herpes ? "Shot in the ass. The herpes is only napping." : "Shot in the ass. You're clean.";
   banner("Free clinic", news + " $20 co-pay.", C.lime); sfx.power();
@@ -1252,7 +1296,7 @@ function clinic() {
 // Dime bags and eighths: the bugs, their shots and the cops all slow down while you're high. The munchies bill comes after.
 function smoke(big) {
   const P = S.player;
-  S.stats.weed++;
+  S.stats.weed++; S.stats[big ? "eighths" : "dimes"]++;
   S.high = Math.min(20, S.high + (big ? 12 : 6)); S.slow = big ? 0.45 : Math.min(S.slow, 0.6);
   S.munch += big ? 1000 : 500;
   pop(big ? "*BIG HIT*" : "*PUFF*", P.x, P.y - 30, C.lime, 20); sfx.puff();
@@ -1263,7 +1307,11 @@ function updateVices(dt) {
   if (S.jam > 0) S.jam = Math.max(0, S.jam - dt);
   if (S.tweak > 0) {
     S.tweak -= dt;
-    if (S.tweak <= 0) { S.tweak = 0; S.crash = Math.max(S.crash, 3); pop("COMEDOWN", P.x, P.y - 34, C.dim, 20); sfx.crash(); }
+    if (S.tweak <= 0) {
+      S.tweak = 0;
+      // No comedown while nose candy is still carrying the ship. Its own crash follows.
+      if (S.turbo <= 0) { S.crash = Math.max(S.crash, 3); pop("COMEDOWN", P.x, P.y - 34, C.dim, 20); sfx.crash(); }
+    }
   }
   if (S.high > 0) {
     S.high -= dt;
@@ -1402,7 +1450,7 @@ function update(dt) {
   if (S.mode === "over") { updateFx(dt); return; }
   if (S.mode === "intro") {
     S.introT += dt;
-    if (!S.introBoom && S.introT >= 1.5) { S.introBoom = true; sfx.boom(); }
+    if (!S.introBoom && S.introT >= 1.5 && S.introT < INTRO) { S.introBoom = true; sfx.boom(); }
     if (S.introT >= INTRO) { S.mode = "play"; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
     return;
   }
@@ -1461,7 +1509,7 @@ function update(dt) {
     for (const b of S.bugs) {
       if (s.dead || b.dead || b.delay > 0) continue;
       const r = b.type === "choker" ? 15 : 12;
-      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; hitBug(b); }
+      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; if (!s.heart) S.stats.hits++; hitBug(b); }
     }
     for (const f of S.flyers) {
       if (s.dead || f.dead) continue;
@@ -1469,10 +1517,10 @@ function update(dt) {
         : f.kind === "keg" ? Math.abs(s.x - f.x) < 16 && Math.abs(s.y - f.y) < 17
         : f.kind === "cop" ? Math.abs(s.x - f.x) < 27 && s.y > f.y - 20 && s.y < f.y + 12
         : Math.abs(s.x - f.x) < 12 && Math.abs(s.y - f.y) < 11;
-      if (hit) { s.dead = true; hitFlyer(f); }
+      if (hit) { s.dead = true; if (!s.heart) S.stats.hits++; hitFlyer(f); }
     }
     const B = S.boss;
-    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; hitBoss(B); }
+    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B); }
   }
 
   if (S.mode === "play") {
@@ -1777,32 +1825,95 @@ function rankFor(c) {
   if (c < 100000) return "High roller";
   return "Kingpin of the galaxy";
 }
+function fillRows(dl, rows) {
+  dl.replaceChildren(...rows.flatMap(([k, v]) => {
+    const dt = document.createElement("dt"); dt.textContent = k;
+    const dd = document.createElement("dd"); dd.textContent = String(v);
+    return [dt, dd];
+  }));
+}
+// The rap sheet: the full stats page, as ordered by Chandler. What went in, who came along, the law, the fight and the books.
+// The books always add up: what you started with, plus what you earned, less every charge, is the final take.
+function buildSheet(c) {
+  const st = S.stats, T = Math.floor(S.t), grams = st.dimes + st.eighths * 3.5;
+  const tally = (o) => Object.entries(o).filter(([, n]) => n).map(([k, n]) => `${k} x${n}`).join(", ");
+  const cost = (label, cents) => (cents ? [[label, "-" + money(cents)]] : []);
+  const sections = [
+    ["Down the hatch", [
+      ["Beers", st.beers],
+      ["Highest BAC", st.beers ? "." + String(st.peakBac).padStart(2, "0") + (st.peakBac >= 8 ? " · over the limit" : "") : "Sober"],
+      ["Blackouts", st.texts / 50],
+      ["Texts to your ex", st.texts],
+      ["Coke snorted", `${st.bags} g`],
+      ["Weed smoked", `${(grams / 28.35).toFixed(2)} oz`],
+      ["8-balls", `${st.eightballs} · ${(st.eightballs * 3.5).toFixed(1)} g`],
+    ]],
+    ["Company", [
+      ["Escorts hired", `${st.escorts} · ${money(st.escortCents)}`],
+      ["Rubbers used", st.rubbersUsed],
+      ["STDs caught", tally(st.stdHits) || "None. Somehow."],
+      ["Clinic visits", st.clinics],
+    ]],
+    ["Law and order", [
+      ["DUIs", st.duis],
+      ["Tickets", st.tickets],
+      ["Pimp slaps", st.slaps],
+      ["Divorce papers served", st.papers],
+    ]],
+    ["The fight", [
+      ["Time alive", `${Math.floor(T / 60)}:${String(T % 60).padStart(2, "0")}`],
+      ["Wave reached", S.wave],
+      ["Bugs smashed", st.kills],
+      ["Shots fired", S.shots],
+      ["Accuracy", S.shots ? `${Math.round(100 * st.hits / S.shots)}%` : "n/a"],
+      ["Cocks / tits", `${st.cocks} / ${st.tits}`],
+      ["Bosses beaten", st.bosses],
+      ["Choked out", st.chokes],
+      ["Navy SEAL rescues", st.cody],
+      ["Hits taken", tally(st.hitsBy) || "None"],
+      ["Finished off by", st.lastHit || "Nothing"],
+    ]],
+    ["The books", [
+      ["Started with", money(1000)],
+      ["Earned shooting things", money(st.earned)],
+      ...(st.refundCents ? [["DUI refunds", money(st.refundCents)]] : []),
+      ...cost("Texting bill", S.billCents),
+      ...cost("Escorts", st.escortCents),
+      ...cost("DUI fines", st.duis * 5000),
+      ...cost("Tickets", st.tickets * 1500),
+      ...cost("The pimp's cut", st.slaps * 2000),
+      ...cost("Clinic co-pays", st.clinics * 2000),
+      ...cost("Munchies", st.munchCents),
+      ...cost("Her half", st.papersCents),
+      ["Final take", money(c)],
+    ]],
+  ];
+  $("sheetBody").replaceChildren(...sections.map(([title, rows]) => {
+    const box = document.createElement("div"), h = document.createElement("h3"), dl = document.createElement("dl");
+    h.className = "eyebrow"; h.textContent = title; dl.className = "rows";
+    fillRows(dl, rows); box.append(h, dl);
+    return box;
+  }));
+}
 function showOver() {
+  // Dying while still high doesn't get you out of the munchies bill.
+  if (S.munch) { S.cents -= S.munch; S.stats.munchCents += S.munch; S.munch = 0; }
+  S.high = 0; S.slow = 1;
   const c = Math.round(S.cents);
   $("rank").textContent = rankFor(c);
   const cash = $("cash");
   cash.textContent = money(c); cash.classList.toggle("debt", c < 0);
   const stds = S.stats.stds.join(", ");
-  const rows = [
+  // The end screen is the receipt. Everything else is on the rap sheet behind it.
+  fillRows($("stats"), [
     ["Wave reached", S.wave],
     ["Bugs smashed", S.stats.kills],
     ["Texting bill", `${money(S.billCents)} · ${S.shots} shots`],
-    ["Nose candy", `${S.stats.bags} bags`],
-    ["Escorts hired", `${S.stats.escorts} · ${money(S.stats.escortCents)}`],
     ["Drinks / DUIs", `${S.stats.beers} / ${S.stats.duis}`],
     ["STDs caught", stds ? stds[0].toUpperCase() + stds.slice(1) : "None. Somehow."],
-    ["Cocks / tits", `${S.stats.cocks} / ${S.stats.tits}`],
-  ];
-  if (S.stats.weed) rows.push(["Weed / munchies", `${S.stats.weed} · ${money(S.stats.munchCents)}`]);
-  if (S.stats.texts) rows.push(["Texts to your ex", S.stats.texts]);
-  if (S.stats.chokes) rows.push(["Choked out", `${S.stats.chokes} time${S.stats.chokes === 1 ? "" : "s"}`]);
-  if (S.stats.bosses || S.stats.eightballs) rows.push(["Bosses / 8-balls", `${S.stats.bosses} / ${S.stats.eightballs}`]);
-  if (S.stats.cody) rows.push(["Navy SEAL rescues", S.stats.cody]);
-  $("stats").replaceChildren(...rows.flatMap(([k, v]) => {
-    const dt = document.createElement("dt"); dt.textContent = k;
-    const dd = document.createElement("dd"); dd.textContent = String(v);
-    return [dt, dd];
-  }));
+    ["Bosses beaten", S.stats.bosses],
+  ]);
+  buildSheet(c);
   const best = store.get("sd-best", null);
   const isBest = best === null || c > best;
   if (isBest) store.set("sd-best", c);
@@ -1818,9 +1929,10 @@ function start() {
   const skip = /^#boss([1-4])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
   if (introSeen) banner("Wave 1", "Every shot costs ten cents.", C.cyan);
+  else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.touchFire = false; input.dragging = false;
-  $("title").hidden = true; $("over").hidden = true; $("board").hidden = true;
+  $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
 
 // ---------- leaderboard: Firestore in the Comet Cadet project, in its own collection ----------
@@ -1891,6 +2003,8 @@ async function openBoard(from) {
 $("titleBoard").addEventListener("click", () => openBoard("title"));
 $("overBoard").addEventListener("click", () => openBoard("over"));
 $("boardBack").addEventListener("click", () => { $("board").hidden = true; $(boardFrom).hidden = false; });
+$("overSheet").addEventListener("click", () => { $("over").hidden = true; $("sheet").hidden = false; $("sheet").scrollTop = 0; });
+$("sheetBack").addEventListener("click", () => { $("sheet").hidden = true; $("over").hidden = false; });
 
 nameInput.value = store.get("sd-name", "");
 $("postForm").addEventListener("submit", async (e) => {
@@ -1917,24 +2031,28 @@ $("postForm").addEventListener("submit", async (e) => {
 
 // ---------- input ----------
 const toX = (e) => { const r = cv.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * W; };
-cv.addEventListener("pointerdown", (e) => {
-  if (S && S.mode === "intro") { S.introT = INTRO; return; }
-  if (!S || S.mode !== "play") return;
+// Touches count anywhere on the page, not just on the game, so the thumb can work from the pad underneath.
+document.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch" && !touched) { touched = true; relayout(); }
+  if (e.target && e.target.closest && e.target.closest("button, input, a")) return;
+  // The tap that skips the intro also starts the drag, so a finger left on the glass flies and fires straight away.
+  if (S && S.mode === "intro") S.introT = INTRO;
+  else if (!S || S.mode !== "play") return;
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
   // The ship already sits at its anchor plus the drunk sway, so anchor the drag without the sway or it counts twice.
   input.dragging = true; input.touchFire = true; input.lastFx = toX(e); input.target = clamp(S.player.x - S.player.wob, 16, W - 16);
 });
-cv.addEventListener("pointermove", (e) => {
+document.addEventListener("pointermove", (e) => {
   if (!input.dragging) return;
   const x = toX(e);
   input.target = clamp(input.target + (x - input.lastFx) * 1.3, 16, W - 16);
   input.lastFx = x;
 });
 const release = () => { input.dragging = false; input.touchFire = false; };
-cv.addEventListener("pointerup", release);
-cv.addEventListener("pointercancel", release);
+document.addEventListener("pointerup", release);
+document.addEventListener("pointercancel", release);
 cv.addEventListener("lostpointercapture", release);
 const FIRE = ["Space", "ArrowUp", "KeyW"], LEFT = ["ArrowLeft", "KeyA"], RIGHT = ["ArrowRight", "KeyD"];
 addEventListener("keydown", (e) => {
