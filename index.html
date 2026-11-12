@@ -23,6 +23,7 @@
   --red: #ff5b4d;
   --navy: #2547a8;
   --skin: #f3b58f;
+  --brown: #8a5a3c;
   --scrim: rgba(12, 7, 22, 0.88);
   --pink-glow: rgba(255, 61, 158, 0.28);
   --gold-glow: rgba(255, 200, 71, 0.3);
@@ -276,7 +277,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v13</span>
+  <span id="ver">v14</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -296,7 +297,7 @@ const tok = (n) => css.getPropertyValue(n).trim();
 const C = {
   void: tok("--void"), deep: tok("--deep"), ink: tok("--ink"), dim: tok("--dim"), pink: tok("--pink"),
   gold: tok("--gold"), cyan: tok("--cyan"), lime: tok("--lime"), red: tok("--red"), navy: tok("--navy"),
-  skin: tok("--skin"),
+  skin: tok("--skin"), brown: tok("--brown"),
 };
 const FONT_HUD = '"VT323", ui-monospace, Menlo, monospace';
 const FONT_SIGN = '"Bungee", Impact, "Arial Black", sans-serif';
@@ -596,43 +597,123 @@ function drawRooster(g, x, y, t, dir, flash) {
   g.restore();
 }
 function drawBertha(g, x, y, t, flash, mad) {
+  // As ordered by Chandler: an eldritch horror beyond human comprehension. She kept the hair and the lipstick.
   g.save(); g.translate(x, y); g.rotate(Math.sin(t * 3) * 0.04);
-  const dress = flash ? C.ink : C.pink;
+  const flesh = flash ? C.ink : C.pink, speed = mad ? 5 : 2.6;
+  g.lineCap = "round"; g.lineJoin = "round";
   g.fillStyle = C.gold; g.beginPath(); g.ellipse(0, -40, 25, 20, 0, 0, TAU); g.fill();
-  g.strokeStyle = C.skin; g.lineWidth = 9; g.lineCap = "round";
-  g.beginPath(); g.moveTo(-32, 0); g.lineTo(-47, 16); g.moveTo(32, 0); g.lineTo(48, 12); g.stroke();
-  g.fillStyle = C.gold; g.fillRect(41, 12, 15, 12);
-  g.strokeStyle = C.gold; g.lineWidth = 2; g.beginPath(); g.arc(48.5, 12, 6, Math.PI, 0); g.stroke();
-  g.fillStyle = dress;
+  // Tentacles first, so the body sits over where they come out. Each is a base point and the way it reaches.
+  const TENT = [[-34, 4, 2.9], [-38, 16, 3.3], [-30, 30, 2.4], [-14, 40, 1.9], [14, 40, 1.25], [30, 30, 0.75], [38, 16, -0.15], [34, 4, 0.25]];
+  TENT.forEach(([ax, ay, ang], k) => {
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    let px = ax, py = ay;
+    for (let i = 1; i <= 6; i++) {
+      const f = i / 6, w = Math.sin(t * speed + k * 1.7 + f * 5) * 8 * f;
+      const nx = ax + dx * 30 * f - dy * w, ny = ay + dy * 30 * f + dx * w;
+      g.strokeStyle = flesh; g.lineWidth = 10 - f * 7;
+      g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke();
+      if (i % 2 === 0) { g.fillStyle = C.lime; g.beginPath(); g.arc((px + nx) / 2, (py + ny) / 2, 1.4, 0, TAU); g.fill(); }
+      px = nx; py = ny;
+    }
+  });
+  g.fillStyle = flesh;
   g.beginPath(); g.ellipse(0, 14, 40, 30, 0, 0, TAU); g.fill();
   g.beginPath(); g.arc(-13, -3, 15, 0, TAU); g.fill();
   g.beginPath(); g.arc(13, -3, 15, 0, TAU); g.fill();
-  g.fillStyle = C.skin; g.beginPath(); g.moveTo(-17, -15); g.quadraticCurveTo(0, 6, 17, -15); g.closePath(); g.fill();
-  g.strokeStyle = C.deep; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -10); g.lineTo(0, -5); g.stroke();
-  g.strokeStyle = C.ink; g.lineWidth = 6; g.globalAlpha = 0.9;
-  for (const sx of [-1, 1]) {
-    g.beginPath();
-    for (let i = 0; i <= 6; i++) {
-      const bx = sx * (20 + i * 3.5 + Math.sin(t * 4 + i * 1.4) * 2.5), by = -17 + i * 7;
-      if (i) g.lineTo(bx, by); else g.moveTo(bx, by);
-    }
-    g.stroke();
+  // The maw: a mouth where no mouth should be, opening and closing down the middle of her.
+  const gape = (mad ? 9 : 5.5) + Math.sin(t * (mad ? 7 : 3)) * (mad ? 4 : 2.5);
+  g.fillStyle = C.void; g.beginPath(); g.ellipse(0, 20, gape, 17, 0, 0, TAU); g.fill();
+  g.fillStyle = C.red; g.beginPath(); g.ellipse(0, 24, gape * 0.5, 8, 0, 0, TAU); g.fill();
+  g.fillStyle = C.ink;
+  for (let i = 0; i < 6; i++) {
+    const ty = 6 + i * 5.6, hw = gape * Math.sqrt(Math.max(0, 1 - ((ty - 20) / 17) ** 2)), tooth = Math.min(4, hw);
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * hw, ty - 2.4); g.lineTo(sx * (hw - tooth), ty); g.lineTo(sx * hw, ty + 2.4); g.closePath(); g.fill(); }
   }
-  g.globalAlpha = 1;
+  // Too many eyes, none of them looking the same way, each blinking on its own schedule.
+  const EYES = [[-24, 6, 5], [-27, 22, 3.6], [-15, 35, 3], [22, 4, 4.2], [28, 20, 5.4], [16, 35, 3.2], [-13, -5, 3.4], [13, -6, 3]];
+  EYES.forEach(([ex, ey, r], i) => {
+    if (Math.sin(t * 1.3 + i * 2.1) > 0.93) {
+      g.strokeStyle = C.void; g.lineWidth = 1.4; g.beginPath(); g.moveTo(ex - r, ey); g.lineTo(ex + r, ey); g.stroke();
+      return;
+    }
+    g.fillStyle = C.ink; g.beginPath(); g.ellipse(ex, ey, r, r * 0.72, 0, 0, TAU); g.fill();
+    const lx = Math.cos(t * 0.9 + i) * r * 0.3, ly = Math.sin(t * 1.1 + i * 0.7) * r * 0.2;
+    g.fillStyle = mad ? C.red : i % 2 ? C.gold : C.cyan; g.beginPath(); g.arc(ex + lx, ey + ly, r * 0.5, 0, TAU); g.fill();
+    g.fillStyle = C.void; g.beginPath(); g.ellipse(ex + lx, ey + ly, r * 0.14, r * 0.42, 0, 0, TAU); g.fill();
+  });
+  // The head she started with: holes where the eyes were, and a smile that goes further than a smile should.
   g.fillStyle = C.skin; g.beginPath(); g.arc(0, -27, 15, 0, TAU); g.fill();
   g.fillStyle = C.gold;
   g.beginPath(); g.ellipse(0, -39, 16, 8, 0, 0, TAU); g.fill();
   g.beginPath(); g.arc(-16, -22, 2.5, 0, TAU); g.fill();
   g.beginPath(); g.arc(16, -22, 2.5, 0, TAU); g.fill();
-  g.fillStyle = C.cyan;
-  g.beginPath(); g.ellipse(-6, -29, 4.2, 2.6, 0, 0, TAU); g.fill();
-  g.beginPath(); g.ellipse(6, -29, 4.2, 2.6, 0, 0, TAU); g.fill();
-  g.strokeStyle = C.void; g.lineWidth = 1.6;
-  g.beginPath(); g.arc(-6, -28.5, 3.4, 0.15, Math.PI - 0.15); g.stroke();
-  g.beginPath(); g.arc(6, -28.5, 3.4, 0.15, Math.PI - 0.15); g.stroke();
-  if (mad) { g.beginPath(); g.moveTo(-11, -35); g.lineTo(-3, -32); g.moveTo(11, -35); g.lineTo(3, -32); g.stroke(); }
-  g.fillStyle = C.red; g.beginPath(); g.ellipse(0, -19, 5.5, mad ? 4 : 2.8, 0, 0, TAU); g.fill();
-  g.fillStyle = C.void; g.beginPath(); g.arc(8, -21, 1.1, 0, TAU); g.fill();
+  g.fillStyle = C.void;
+  g.beginPath(); g.ellipse(-6, -29, 4.4, 3.4, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(6, -29, 4.4, 3.4, 0, 0, TAU); g.fill();
+  g.fillStyle = mad ? C.red : C.lime;
+  g.beginPath(); g.arc(-6 + Math.sin(t * 2) * 1.2, -29, 1.1, 0, TAU); g.fill();
+  g.beginPath(); g.arc(6 + Math.sin(t * 2) * 1.2, -29, 1.1, 0, TAU); g.fill();
+  g.strokeStyle = C.red; g.lineWidth = 2.6;
+  g.beginPath(); g.moveTo(-13, -22); g.quadraticCurveTo(0, mad ? -8 : -11, 13, -22); g.stroke();
+  g.fillStyle = C.ink;
+  for (let i = -3; i <= 3; i++) g.fillRect(i * 2.8 - 0.8, -18 + (i * i) * 0.35 - (mad ? -1.2 : 0), 1.6, 2);
+  // Something orbits her head. It is better not to ask what.
+  g.strokeStyle = C.lime; g.lineWidth = 1.5; g.globalAlpha = 0.7;
+  for (let i = 0; i < 6; i++) { const a = t * 1.2 + i * TAU / 6; g.beginPath(); g.arc(Math.cos(a) * 30, -52 + Math.sin(a) * 7, 2 + (i % 2), 0, TAU); g.stroke(); }
+  g.globalAlpha = 1;
+  g.restore();
+}
+// Jon Jones, as ordered by Chandler and Ayden. Past half health the roid rage kicks in.
+function drawJones(g, x, y, t, flash, mad) {
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 3) * 0.04);
+  if (mad) { const z = 1.08 + (reduced ? 0 : Math.sin(t * 9) * 0.015); g.scale(z, z); }
+  const skin = flash ? C.ink : C.brown, bob = Math.sin(t * 5) * 2;
+  g.lineCap = "round"; g.lineJoin = "round";
+  g.strokeStyle = skin; g.lineWidth = 11;
+  g.beginPath(); g.moveTo(-11, 36); g.lineTo(-14, 46); g.moveTo(11, 36); g.lineTo(14, 46); g.stroke();
+  g.fillStyle = C.void; g.strokeStyle = C.dim; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(-21, 22); g.lineTo(21, 22); g.lineTo(24, 40); g.lineTo(2, 40); g.lineTo(0, 33); g.lineTo(-2, 40); g.lineTo(-24, 40); g.closePath(); g.fill(); g.stroke();
+  g.strokeStyle = C.gold; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-23, 37); g.lineTo(-3, 37); g.moveTo(3, 37); g.lineTo(23, 37); g.stroke();
+  // Wide at the shoulders, narrow at the waist, with the traps to match.
+  g.fillStyle = skin;
+  g.beginPath(); g.moveTo(-38, -12); g.quadraticCurveTo(0, -24, 38, -12); g.lineTo(21, 24); g.lineTo(-21, 24); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(-20, -14); g.lineTo(-7, -27); g.lineTo(7, -27); g.lineTo(20, -14); g.closePath(); g.fill();
+  g.strokeStyle = C.void; g.globalAlpha = 0.35; g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(-24, -1); g.quadraticCurveTo(-12, 6, 0, -1); g.quadraticCurveTo(12, 6, 24, -1);
+  g.moveTo(0, -8); g.lineTo(0, 18); g.moveTo(-11, 9); g.lineTo(11, 9); g.moveTo(-10, 15); g.lineTo(10, 15); g.stroke();
+  g.globalAlpha = 1;
+  // The belt.
+  g.fillStyle = C.gold; g.fillRect(-23, 19, 46, 7);
+  g.beginPath(); g.ellipse(0, 22.5, 9, 6.5, 0, 0, TAU); g.fill();
+  g.strokeStyle = C.red; g.lineWidth = 1.2; g.beginPath(); g.ellipse(0, 22.5, 6, 4, 0, 0, TAU); g.stroke();
+  // Hands up, gloves on.
+  g.strokeStyle = skin; g.lineWidth = 13;
+  g.beginPath(); g.moveTo(-34, -8); g.lineTo(-50, 8); g.lineTo(-44, -10 + bob); g.moveTo(34, -8); g.lineTo(50, 8); g.lineTo(44, -10 - bob); g.stroke();
+  for (const [gx, gy] of [[-44, -14 + bob], [44, -14 - bob]]) {
+    g.fillStyle = C.red; g.beginPath(); g.arc(gx, gy, 8.5, 0, TAU); g.fill();
+    g.strokeStyle = C.gold; g.lineWidth = 1.5; g.beginPath(); g.arc(gx, gy, 8.5, 0, TAU); g.stroke();
+  }
+  g.fillStyle = skin; g.beginPath(); g.arc(0, -35, 13, 0, TAU); g.fill();
+  g.fillStyle = C.void;
+  g.beginPath(); g.arc(0, -37, 13.4, Math.PI * 1.08, Math.PI * 1.92); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(-9, -30); g.quadraticCurveTo(0, -17, 9, -30); g.quadraticCurveTo(0, -25, -9, -30); g.fill();
+  g.fillStyle = mad ? C.red : C.ink;
+  g.beginPath(); g.ellipse(-5, -37, 2.6, 1.8, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(5, -37, 2.6, 1.8, 0, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(-5, -37, 0.9, 0, TAU); g.fill(); g.beginPath(); g.arc(5, -37, 0.9, 0, TAU); g.fill();
+  g.strokeStyle = C.void; g.lineWidth = 1.8;
+  g.beginPath(); g.moveTo(-9, -41.5); g.lineTo(-2, -39.5); g.moveTo(9, -41.5); g.lineTo(2, -39.5); g.stroke();
+  if (mad) {
+    // Roid rage: veins up the arms and neck, and steam coming off him.
+    g.strokeStyle = C.red; g.lineWidth = 1.4;
+    g.beginPath();
+    g.moveTo(-40, -2); g.lineTo(-45, 3); g.lineTo(-43, 8); g.moveTo(40, -2); g.lineTo(45, 3); g.lineTo(43, 8);
+    g.moveTo(-6, -24); g.lineTo(-9, -17); g.moveTo(6, -24); g.lineTo(9, -17); g.moveTo(-30, -6); g.lineTo(-24, -9); g.moveTo(30, -6); g.lineTo(24, -9);
+    g.stroke();
+    g.fillStyle = C.ink; g.globalAlpha = 0.5;
+    for (let i = 0; i < 4; i++) { const f = (t * 0.9 + i * 0.25) % 1; g.beginPath(); g.arc(-18 + i * 12 + Math.sin(t * 3 + i) * 3, -52 - f * 14, 2.5 + f * 3, 0, TAU); g.fill(); }
+    g.globalAlpha = 1;
+  }
   g.restore();
 }
 function drawPimp(g, x, y, t, flash, mad) {
@@ -802,6 +883,23 @@ function drawEnemyShot(g, e, t) {
     g.strokeStyle = C.red; g.lineWidth = 1.2; g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.stroke();
     g.shadowBlur = 0; g.fillStyle = C.ink;
     for (let i = 0; i < 5; i++) g.fillRect(Math.cos(i * 1.3 + 0.4) * 6 - 0.9, Math.sin(i * 1.3 + 0.4) * 6 - 0.9, 1.8, 1.8);
+  } else if (e.kind === "fist") {
+    g.rotate(Math.atan2(e.vy, e.vx) - Math.PI / 2);
+    g.shadowColor = C.red; g.shadowBlur = 10; g.fillStyle = C.red;
+    g.beginPath(); g.arc(0, 2, 7.5, 0, TAU); g.fill();
+    g.shadowBlur = 0; g.strokeStyle = C.ink; g.lineWidth = 1.2; g.beginPath(); g.arc(0, 2, 4, 0.4, Math.PI - 0.4); g.stroke();
+    g.fillStyle = C.gold; g.fillRect(-6, -9, 12, 3.5);
+  } else if (e.kind === "poke") {
+    g.rotate(Math.sin(t * 8 + ph) * 0.2);
+    g.shadowColor = C.red; g.shadowBlur = 10; g.strokeStyle = C.brown; g.lineWidth = 3.6; g.lineCap = "round";
+    g.beginPath(); g.moveTo(-1.5, -6); g.lineTo(-4.5, 9); g.moveTo(1.5, -6); g.lineTo(4.5, 9); g.stroke();
+    g.shadowBlur = 0; g.fillStyle = C.brown; g.beginPath(); g.arc(0, -8, 5, 0, TAU); g.fill();
+    g.strokeStyle = C.red; g.lineWidth = 1.2; g.beginPath(); g.arc(0, -8, 6.5, 0, TAU); g.stroke();
+  } else if (e.kind === "elbow") {
+    g.rotate(reduced ? ph : t * 10 + ph);
+    g.shadowColor = C.red; g.shadowBlur = 10; g.strokeStyle = C.brown; g.lineWidth = 5.5; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(-6, -7); g.lineTo(6, 0); g.lineTo(-6, 7); g.stroke();
+    g.shadowBlur = 0; g.strokeStyle = C.red; g.lineWidth = 1.2; g.beginPath(); g.arc(0, 0, 10.5, 0, TAU); g.stroke();
   } else if (e.kind === "pan") {
     g.rotate(t * 9 + ph);
     g.shadowColor = C.red; g.shadowBlur = 8; g.fillStyle = C.dim;
@@ -880,7 +978,7 @@ const WAVE_LINES = [
   "Zach thinks this is lame. Prove him wrong.",
 ];
 const SHOT_LINES = ["Should've gotten an iPhone.", "That's going in the group chat.", "Walk it off."];
-const SHOT_HALF = { kiss: 11, slap: 11, pan: 10, donut: 9, papers: 9, ticket: 8 };
+const SHOT_HALF = { kiss: 11, slap: 11, pan: 10, donut: 9, papers: 9, ticket: 8, fist: 9, poke: 8, elbow: 10 };
 
 // The ship has the bottom quarter of the screen to move around in.
 const Y_MAX = H - 74, Y_MIN = H - 224;
@@ -898,7 +996,7 @@ function newState() {
     mode: "play", t: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0,
+    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1054,9 +1152,10 @@ function hitFlyer(f, dmg = 1) {
 
 // ---------- the bosses: one every third wave, in this order, then round again and tougher ----------
 const BOSS_Y = 172;
-const BOSS_ORDER = ["bertha", "pimp", "sheriff", "wife"];
+const BOSS_ORDER = ["bertha", "jones", "pimp", "sheriff", "wife"];
 const BOSSES = {
-  bertha: { name: "Big Bertha", draw: drawBertha, intro: ["Boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy."], down: ["Bertha's down", "The hot one is free. She fights for you, no charge."] },
+  bertha: { name: "Big Bertha", draw: drawBertha, intro: ["Boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy. Tentacles by Chandler."], down: ["Bertha's down", "The hot one is free. She fights for you, no charge."] },
+  jones: { name: "Jon Jones", draw: drawJones, intro: ["Boss: Jon Jones", "You're drunk, you're high, and you just called out the GOAT."], down: ["And new", "You beat Jon Jones. Nobody is going to believe you. The belt pays $100."] },
   pimp: { name: "Big Daddy Velvet", draw: drawPimp, intro: ["Boss: Big Daddy Velvet", "The escorts work for him. He wants his cut."], down: ["Velvet's out of business", "One of his girls works for you now. No charge."] },
   sheriff: { name: "Sheriff Buzzkill", draw: drawSheriff, intro: ["Boss: Sheriff Buzzkill", "License, registration and a breathalyzer."], down: ["The sheriff's down", "Charges dropped. Your DUI fines come back."] },
   wife: { name: "Your Wife", draw: drawWife, intro: ["Boss: your wife", "She saw the escort charges on the statement."], down: ["She's cooled off", "You're on the couch tonight. +1 life."] },
@@ -1094,6 +1193,11 @@ function bossAttack(B) {
     if (kind === 0) fan({}, mad ? 7 : 5, 0.2, sp);
     else if (kind === 1) seekers({ kind: "kiss" }, mad ? [-40, 0, 40] : [-28, 28]);
     else spawnFlyby("rooster");
+  } else if (B.key === "jones") {
+    // Jabs from a long way off, eye pokes that find you, and a wall of elbows with one way through.
+    if (kind === 0) fan({ kind: "fist" }, mad ? 7 : 5, 0.18, sp + (mad ? 45 : 15));
+    else if (kind === 1) seekers({ kind: "poke" }, mad ? [-44, 0, 44] : [-30, 30]);
+    else row({ kind: "elbow" }, mad && S.crash <= 0 ? 185 : 155);
   } else if (B.key === "pimp") {
     if (kind === 0) seekers({ kind: "slap" }, mad ? [-44, 0, 44] : [-30, 30]);
     else if (kind === 1) row({ kind: "coin" }, mad && S.crash <= 0 ? 175 : 150);
@@ -1140,7 +1244,10 @@ function updateBoss(dt) {
 function hitBoss(B, dmg = 1) {
   B.hp -= dmg; B.flash = 0.06;
   if (B.hp > 0) {
-    if (!B.balls && B.hp < B.maxHp / 2) { B.balls = 1; dropEightBall(B); }
+    if (!B.balls && B.hp < B.maxHp / 2) {
+      B.balls = 1; dropEightBall(B);
+      if (B.key === "jones") banner("Roid rage", "He swears it was a tainted supplement. Everything he throws is faster now.", C.red);
+    }
     if (Math.floor(B.hp) % 3 === 0) sfx.tink();
     return;
   }
@@ -1160,6 +1267,8 @@ function finishBoss(B) {
     S.refunded = S.stats.duis;
     if (back) { S.cents += back; S.stats.refundCents += back; pop(`DUI refund +${money(back)}`, B.x, B.y + 28, C.cyan, 18); }
     else sub = "Charges dropped. Your record was clean anyway.";
+  } else if (B.key === "jones") {
+    S.cents += 10000; S.stats.earned += 10000; pop("Title bonus +$100.00", B.x, B.y + 28, C.gold, 18);
   } else if (S.lives < 5) S.lives++;
   else sub = "You're on the couch tonight.";
   banner(BOSSES[B.key].down[0], sub, C.gold);
@@ -1185,6 +1294,9 @@ function shotHit(e) {
     ticket: ["Ticketed", "Failure to yield. That's $15."],
     donut: ["Glazed", "Donut to the face. Still warm."],
     pan: ["Frying pan", "She's got an arm on her."],
+    fist: ["Jabbed", "84 inch reach. You never saw it leave."],
+    poke: ["Eye poke", "The ref didn't see it. He never does."],
+    elbow: ["Spinning elbow", "Twelve to six. Somehow legal now."],
   }[k] || ["Shot down", pick(SHOT_LINES)];
   hurt(line[0], line[1]);
 }
@@ -1217,7 +1329,7 @@ function collect(kind) {
     S.stats.bags++; S.turbo = Math.min(12, S.turbo + 6); S.crash = 0;
     pop("*SNIFF*", P.x, P.y - 30, C.ink, 20); sfx.sniff();
     S.hot = false; S.heat = 0;
-    if (S.drinks > 2) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
+    if (S.drinks > 2 && S.bumpWave !== S.wave) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
   } else if (kind === "card") {
     if (S.escort && S.escort.free) { pop("You've already got the hot one", P.x, P.y - 34, C.gold, 15); return; }
     if (S.cents <= 0) { pop("She saw your bank account", P.x, P.y - 34, C.pink, 15); return; }
@@ -1239,7 +1351,7 @@ function collect(kind) {
     S.stats.eightballs++; S.tweak = Math.min(16, S.tweak + 8); S.crash = 0;
     pop("*8-BALL*", P.x, P.y - 30, C.cyan, 20); sfx.sniff();
     S.hot = false; S.heat = 0;
-    if (S.drinks > 2) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
+    if (S.drinks > 2 && S.bumpWave !== S.wave) keyBump(); else if (S.drinks > 1) pop("Sobered right up", P.x, P.y - 52, C.gold, 15);
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
   } else {
     S.lives++; S.stats.cody++;
@@ -1254,13 +1366,13 @@ function hurt(title, sub) {
   if (S.dual) {
     S.dual = false; P.inv = 2.2; S.shake = 0.5;
     burst(P.x + 11, P.y, C.gold, 26); sfx.hurt();
-    banner("Honcho down", `${title}. The spare took it for you.`, C.red);
+    banner("Honcho down", `${sub} The spare took the hit.`, C.red);
     return;
   }
   S.lives--; P.inv = 2.2; S.shake = 0.5;
   burst(P.x, P.y, C.gold, 26); sfx.hurt();
   banner(title, sub, C.red);
-  if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; input.touchFire = false; }
+  if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; input.touchFire = false; }
 }
 
 // ---------- booze and STDs ----------
@@ -1279,8 +1391,9 @@ const punch = () => payMult();
 const wired = () => S.turbo > 0 || S.tweak > 0;
 const sloppy = () => (wired() ? 0 : Math.min(S.drinks, 4));
 // Jeremy's key bump: a sniff with three or more beers on board stops the world for a beat and says so.
+// Once a wave, at his request; after that the same sniff just gets the small pop.
 const BUMP = 0.75;
-function keyBump() { S.bump = BUMP; S.stats.bumps++; sfx.power(); }
+function keyBump() { S.bump = BUMP; S.bumpWave = S.wave; S.shake = 0; S.stats.bumps++; sfx.power(); }
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
 // Rounded up, because a drink starts wearing off the moment it lands and two quick beers should still blow .08.
 const bac = () => Math.ceil(S.drinks * 4 - 1e-6);
@@ -1409,8 +1522,7 @@ function updatePlayer(dt) {
   let target = input.dragging ? input.target + wob : gyro.on ? gyroTarget() + wob : P.x + dw;
   if (input.left) target = -1e4;
   if (input.right) target = 1e4;
-  const edge = S.dual ? 27 : 16;
-  P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), edge, W - edge);
+  P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), edgeX(), W - edgeX());
   if (!input.dragging) input.target = P.x;
   let targetY = input.dragging ? input.targetY : P.y;
   if (input.up) targetY = -1e4;
@@ -1619,7 +1731,8 @@ function update(dt) {
   // However the choker holding your ship goes down, the ship comes loose and flies home to dock.
   for (const b of S.bugs) {
     if (!b.dead || !b.captive) continue;
-    S.rescue = { x: b.x, y: b.y - 22 };
+    const c = b.captive, k = ease(c.t);
+    S.rescue = { x: c.x + (b.x - c.x) * k, y: c.y + (b.y - 22 - c.y) * k };
     pop("HONCHO'S LOOSE", b.x, b.y - 34, C.gold, 18); sfx.power();
   }
   const R = S.rescue;
@@ -1857,12 +1970,12 @@ function render() {
     if (S.hot || S.heat > 0.55) {
       ctx.globalAlpha = S.hot ? (reduced ? 0.9 : 0.55 + 0.45 * Math.sin(S.t * 20)) : (S.heat - 0.55) * 2.2;
       ctx.strokeStyle = C.red; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(P.x, P.y - 13, 12, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      for (const gx of S.dual ? [-11, 11] : [0]) { ctx.beginPath(); ctx.arc(P.x + gx, P.y - 13, 12, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
       ctx.globalAlpha = 1;
     }
     if (S.flare > 0 || S.jam > 0) {
       ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.t * 30); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(P.x, P.y, 24, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(P.x, P.y, S.dual ? 34 : 24, 0, TAU); ctx.stroke();
     }
   }
   for (const p of S.parts) { ctx.globalAlpha = Math.min(1, p.life * 2); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
@@ -2068,8 +2181,8 @@ function showOver() {
 function start() {
   ensureAudio();
   S = newState(); spawnWave();
-  // Shortcuts for testing the bosses: open the page with #boss1 to #boss4 on the end of the link (#bertha still works).
-  const skip = /^#boss([1-4])$/.exec(location.hash);
+  // Shortcuts for testing the bosses: open the page with #boss1 to #boss5 on the end of the link (#bertha still works).
+  const skip = /^#boss([1-5])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
   if (introSeen) banner("Wave 1", "Guns overheat. Tap Fire to rest them.", C.cyan);
   else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
@@ -2179,7 +2292,9 @@ const toXY = (e) => {
   const r = cv.getBoundingClientRect();
   return [((e.clientX - r.left) / r.width) * W, typeof e.clientY === "number" ? ((e.clientY - r.top) / r.height) * H : input.lastFy];
 };
-// Every finger that is down on the game, and where it last was. One of them steers; if it lifts, another takes over.
+// How close to the side walls the ship may go: further in when there are two of them.
+const edgeX = () => (S && S.dual ? 27 : 16);
+// Every finger that is down on the game, where it last was and what kind of pointer it is. One of them steers; if it lifts, another takes over.
 const fingers = new Map();
 let steerId = null;
 const idOf = (e) => (e && e.pointerId !== undefined ? e.pointerId : steerId === null ? 0 : steerId);
@@ -2196,23 +2311,26 @@ document.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
-  // The mouse, or the first finger of a touch, means nothing else can still be down: forget anything left over.
-  if (e.isPrimary !== false) { fingers.clear(); input.dragging = false; }
+  // The mouse, or the first finger of a touch, means no other pointer of its kind can still be down: forget any left over.
+  if (e.isPrimary !== false) {
+    for (const [fid, f] of fingers) if (f[2] === e.pointerType) fingers.delete(fid);
+    if (!fingers.has(steerId)) input.dragging = false;
+  }
   const id = e.pointerId === undefined ? 0 : e.pointerId;
-  fingers.set(id, toXY(e));
+  fingers.set(id, [...toXY(e), e.pointerType]);
   if (input.dragging) return;
   steerWith(id);
   // The ship already sits at its anchor plus the drunk sway, so anchor the drag without the sway or it counts twice.
   input.dragging = true; input.touchFire = true;
-  input.target = clamp(S.player.x - S.player.wob, 16, W - 16); input.targetY = S.player.y;
+  input.target = clamp(S.player.x - S.player.wob, edgeX(), W - edgeX()); input.targetY = S.player.y;
 });
 document.addEventListener("pointermove", (e) => {
   const id = idOf(e);
   if (!fingers.has(id)) return;
-  const [x, y] = toXY(e);
-  fingers.set(id, [x, y]);
+  const [x, y] = toXY(e), f = fingers.get(id);
+  f[0] = x; f[1] = y;
   if (!input.dragging || id !== steerId) return;
-  input.target = clamp(input.target + (x - input.lastFx) * 1.3, 16, W - 16);
+  input.target = clamp(input.target + (x - input.lastFx) * 1.3, edgeX(), W - edgeX());
   input.targetY = clamp(input.targetY + (y - input.lastFy) * 1.3, Y_MIN, Y_MAX);
   input.lastFx = x; input.lastFy = y;
 });
