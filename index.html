@@ -22,6 +22,7 @@
   --lime: #a4ff6b;
   --red: #ff5b4d;
   --navy: #2547a8;
+  --skin: #f3b58f;
   --scrim: rgba(12, 7, 22, 0.88);
   --pink-glow: rgba(255, 61, 158, 0.28);
   --gold-glow: rgba(255, 200, 71, 0.3);
@@ -105,14 +106,14 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   color: var(--cyan); text-shadow: 0 0 calc(var(--u) * 5) var(--cyan), 0 0 calc(var(--u) * 16) var(--cyan);
 }
 .cash {
-  font-size: calc(var(--u) * 72); line-height: 0.85; color: var(--gold);
+  font-size: calc(var(--u) * 60); line-height: 0.85; color: var(--gold);
   font-variant-numeric: tabular-nums; text-shadow: 0 0 calc(var(--u) * 14) var(--gold-glow);
 }
 .cash.debt { color: var(--red); }
 #stats {
   display: grid; grid-template-columns: 1fr auto; margin: 0;
   gap: calc(var(--u) * 3) calc(var(--u) * 14);
-  width: 100%; max-width: calc(var(--u) * 270); font-size: calc(var(--u) * 19); line-height: 1;
+  width: 100%; max-width: calc(var(--u) * 270); font-size: calc(var(--u) * 17); line-height: 1;
 }
 #stats dt { color: var(--dim); text-align: left; }
 #stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
@@ -162,6 +163,10 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #boardList .w { color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
 #boardList li.me .n { color: var(--pink); }
 #boardStatus { font-size: calc(var(--u) * 17); color: var(--dim); text-wrap: balance; }
+#ver {
+  position: absolute; left: calc(var(--u) * 10); bottom: calc(var(--u) * 10); z-index: 2;
+  font-size: calc(var(--u) * 14); color: var(--dim);
+}
 #mute {
   position: absolute; right: calc(var(--u) * 8); bottom: calc(var(--u) * 8); z-index: 2;
   font-family: var(--font-hud); font-size: calc(var(--u) * 15);
@@ -180,14 +185,16 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <h1 class="neon"><span>Manly</span><br><span class="gold">Gal<span class="flick">a</span>xy</span></h1>
     <p class="tag">Space bugs, escorts and nose candy.<br><em>As ordered by Jeremy.</em></p>
     <div class="legend">
-      <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Drone</b><span>$1 a pop</span></div></div>
+      <div class="item"><canvas data-icon="drone" aria-hidden="true"></canvas><div><b>Bugs</b><span>$1 to $5. Double when diving</span></div></div>
       <div class="item"><canvas data-icon="candy" aria-hidden="true"></canvas><div><b>Nose candy</b><span>Turbo, then the crash</span></div></div>
-      <div class="item"><canvas data-icon="hornet" aria-hidden="true"></canvas><div><b>Hornet</b><span>$2 a pop</span></div></div>
+      <div class="item"><canvas data-icon="choker" aria-hidden="true"></canvas><div><b>Choker</b><span>Its beam taps you out</span></div></div>
       <div class="item"><canvas data-icon="card" aria-hidden="true"></canvas><div><b>Escort</b><span>Wingwoman, $1 a second</span></div></div>
-      <div class="item"><canvas data-icon="choker" aria-hidden="true"></canvas><div><b>Choker</b><span>$5. Its beam taps you out</span></div></div>
+      <div class="item"><canvas data-icon="rooster" aria-hidden="true"></canvas><div><b>Huge cock</b><span>$10. It's a rooster</span></div></div>
       <div class="item"><canvas data-icon="cody" aria-hidden="true"></canvas><div><b>Navy SEAL Cody</b><span>+1 life</span></div></div>
+      <div class="item"><canvas data-icon="tit" aria-hidden="true"></canvas><div><b>Great tits</b><span>$3 each. They're birds</span></div></div>
+      <div class="item"><canvas data-icon="bertha" aria-hidden="true"></canvas><div><b>Big Bertha</b><span>Final boss, wave 3</span></div></div>
     </div>
-    <p class="rule">Hold and drag to fly and shoot. Every shot costs ten cents. Bugs pay double while diving.</p>
+    <p class="rule">Hold and drag to fly and shoot. Every shot costs ten cents. Dodge the red stuff.</p>
     <div class="row">
       <button id="play" class="big" type="button">Play</button>
       <button id="titleBoard" class="ghost" type="button">Leaderboard</button>
@@ -224,6 +231,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
+  <span id="ver">v2</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
@@ -238,6 +246,7 @@ const tok = (n) => css.getPropertyValue(n).trim();
 const C = {
   void: tok("--void"), deep: tok("--deep"), ink: tok("--ink"), dim: tok("--dim"), pink: tok("--pink"),
   gold: tok("--gold"), cyan: tok("--cyan"), lime: tok("--lime"), red: tok("--red"), navy: tok("--navy"),
+  skin: tok("--skin"),
 };
 const FONT_HUD = '"VT323", ui-monospace, Menlo, monospace';
 const FONT_SIGN = '"Bungee", Impact, "Arial Black", sans-serif';
@@ -293,6 +302,11 @@ const sfx = {
   warn: () => { tone(660, 0.1, "square", 0.03); tone(660, 0.1, "square", 0.03, 0, 0.16); },
   crash: () => tone(400, 0.8, "sine", 0.06, 90),
   broke: () => { tone(300, 0.25, "square", 0.04, 0, 0); tone(200, 0.4, "square", 0.04, 0, 0.22); },
+  eshot: () => tone(260, 0.1, "sawtooth", 0.03, 120),
+  crow: () => { tone(520, 0.08, "sawtooth", 0.035, 0, 0); tone(700, 0.08, "sawtooth", 0.035, 0, 0.09); tone(620, 0.08, "sawtooth", 0.035, 0, 0.18); tone(880, 0.35, "sawtooth", 0.035, 440, 0.27); },
+  tweet: () => { tone(2400, 0.05, "sine", 0.03, 3100); tone(2700, 0.05, "sine", 0.03, 3300, 0.08); },
+  kiss: () => tone(900, 0.14, "sine", 0.04, 1500),
+  boom: () => { hiss(0.5, 0.12, 300); tone(160, 0.5, "square", 0.05, 40); },
 };
 
 // ---------- sizing ----------
@@ -342,18 +356,19 @@ function drawPlayer(g, x, y, t, turbo) {
   g.globalAlpha = 1;
   g.restore();
 }
-function drawEscort(g, x, y, t) {
+function drawEscort(g, x, y, t, gold) {
+  const body = gold ? C.gold : C.pink;
   g.save(); g.translate(x, y);
-  g.strokeStyle = C.pink; g.lineWidth = 4; g.lineCap = "round"; g.globalAlpha = 0.85;
+  g.strokeStyle = body; g.lineWidth = 4; g.lineCap = "round"; g.globalAlpha = 0.85;
   g.beginPath();
   for (let i = 0; i <= 8; i++) {
     const yy = 7 + i * 3, xx = Math.sin(t * 10 + i * 0.9) * (2 + i * 0.6);
     if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy);
   }
   g.stroke(); g.globalAlpha = 1;
-  g.fillStyle = C.pink;
+  g.fillStyle = body;
   g.beginPath(); g.moveTo(0, -13); g.lineTo(10, 8); g.lineTo(0, 4); g.lineTo(-10, 8); g.closePath(); g.fill();
-  drawHeart(g, 0, -2, 3.2, C.ink);
+  drawHeart(g, 0, -2, 3.2, gold ? C.pink : C.ink);
   g.restore();
 }
 function drawBug(g, type, x, y, t, flash, damaged) {
@@ -420,6 +435,106 @@ function drawDrop(g, kind, x, y, t) {
   }
   g.restore();
 }
+function drawTit(g, x, y, t, dir, flash) {
+  g.save(); g.translate(x, y); g.scale(dir, 1);
+  const flap = Math.sin(t * 22);
+  g.fillStyle = C.cyan;
+  g.beginPath(); g.moveTo(-6, 1); g.lineTo(-15, -2); g.lineTo(-14, 4); g.closePath(); g.fill();
+  g.fillStyle = flash ? C.ink : C.gold;
+  g.beginPath(); g.ellipse(0, 1, 8, 6, 0, 0, TAU); g.fill();
+  g.fillStyle = C.cyan;
+  g.beginPath(); g.ellipse(-2, -1 - flap * 4, 6, 3, -0.3, 0, TAU); g.fill();
+  g.fillStyle = C.navy; g.beginPath(); g.arc(7, -3, 4.6, 0, TAU); g.fill();
+  g.fillStyle = C.ink; g.beginPath(); g.ellipse(7.5, -2, 2.6, 1.8, 0, 0, TAU); g.fill();
+  g.fillStyle = C.red; g.beginPath(); g.moveTo(11, -4.5); g.lineTo(15.5, -3); g.lineTo(11, -1.5); g.closePath(); g.fill();
+  g.restore();
+}
+function drawRooster(g, x, y, t, dir, flash) {
+  g.save(); g.translate(x, y - Math.abs(Math.sin(t * 7)) * 3); g.scale(dir, 1);
+  g.lineCap = "round"; g.lineWidth = 5;
+  for (const [col, ex, ey] of [[C.navy, -30, -30], [C.cyan, -36, -18], [C.lime, -38, -4]]) {
+    g.strokeStyle = col; g.beginPath(); g.moveTo(-13, 0); g.quadraticCurveTo(-22, ey - 8, ex, ey); g.stroke();
+  }
+  const step = Math.sin(t * 7) * 4;
+  g.strokeStyle = C.gold; g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(-4, 13); g.lineTo(-4 + step, 24); g.moveTo(5, 13); g.lineTo(5 - step, 24); g.stroke();
+  g.fillStyle = flash ? C.gold : C.ink;
+  g.beginPath(); g.ellipse(0, 2, 17, 13, 0, 0, TAU); g.fill();
+  g.beginPath(); g.moveTo(8, -4); g.lineTo(15, -24); g.lineTo(24, -22); g.lineTo(16, 5); g.closePath(); g.fill();
+  g.beginPath(); g.arc(20, -24, 7, 0, TAU); g.fill();
+  g.fillStyle = C.dim; g.beginPath(); g.ellipse(-3, 2, 9, 6, 0.3, 0, TAU); g.fill();
+  g.fillStyle = C.red;
+  for (const cx of [15, 20, 25]) { g.beginPath(); g.arc(cx, -31, 3.6, 0, TAU); g.fill(); }
+  g.beginPath(); g.ellipse(24, -15, 2.6, 4.5, 0, 0, TAU); g.fill();
+  g.fillStyle = C.gold; g.beginPath(); g.moveTo(26, -26); g.lineTo(34, -23); g.lineTo(26, -20); g.closePath(); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(22, -25, 1.6, 0, TAU); g.fill();
+  g.restore();
+}
+function drawBertha(g, x, y, t, flash, mad) {
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 3) * 0.04);
+  const dress = flash ? C.ink : C.pink;
+  g.fillStyle = C.gold; g.beginPath(); g.ellipse(0, -40, 25, 20, 0, 0, TAU); g.fill();
+  g.strokeStyle = C.skin; g.lineWidth = 9; g.lineCap = "round";
+  g.beginPath(); g.moveTo(-32, 0); g.lineTo(-47, 16); g.moveTo(32, 0); g.lineTo(48, 12); g.stroke();
+  g.fillStyle = C.gold; g.fillRect(41, 12, 15, 12);
+  g.strokeStyle = C.gold; g.lineWidth = 2; g.beginPath(); g.arc(48.5, 12, 6, Math.PI, 0); g.stroke();
+  g.fillStyle = dress;
+  g.beginPath(); g.ellipse(0, 14, 40, 30, 0, 0, TAU); g.fill();
+  g.beginPath(); g.arc(-13, -3, 15, 0, TAU); g.fill();
+  g.beginPath(); g.arc(13, -3, 15, 0, TAU); g.fill();
+  g.fillStyle = C.skin; g.beginPath(); g.moveTo(-17, -15); g.quadraticCurveTo(0, 6, 17, -15); g.closePath(); g.fill();
+  g.strokeStyle = C.deep; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -10); g.lineTo(0, -5); g.stroke();
+  g.strokeStyle = C.ink; g.lineWidth = 6; g.globalAlpha = 0.9;
+  for (const sx of [-1, 1]) {
+    g.beginPath();
+    for (let i = 0; i <= 6; i++) {
+      const bx = sx * (20 + i * 3.5 + Math.sin(t * 4 + i * 1.4) * 2.5), by = -17 + i * 7;
+      if (i) g.lineTo(bx, by); else g.moveTo(bx, by);
+    }
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = C.skin; g.beginPath(); g.arc(0, -27, 15, 0, TAU); g.fill();
+  g.fillStyle = C.gold;
+  g.beginPath(); g.ellipse(0, -39, 16, 8, 0, 0, TAU); g.fill();
+  g.beginPath(); g.arc(-16, -22, 2.5, 0, TAU); g.fill();
+  g.beginPath(); g.arc(16, -22, 2.5, 0, TAU); g.fill();
+  g.fillStyle = C.cyan;
+  g.beginPath(); g.ellipse(-6, -29, 4.2, 2.6, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(6, -29, 4.2, 2.6, 0, 0, TAU); g.fill();
+  g.strokeStyle = C.void; g.lineWidth = 1.6;
+  g.beginPath(); g.arc(-6, -28.5, 3.4, 0.15, Math.PI - 0.15); g.stroke();
+  g.beginPath(); g.arc(6, -28.5, 3.4, 0.15, Math.PI - 0.15); g.stroke();
+  if (mad) { g.beginPath(); g.moveTo(-11, -35); g.lineTo(-3, -32); g.moveTo(11, -35); g.lineTo(3, -32); g.stroke(); }
+  g.fillStyle = C.red; g.beginPath(); g.ellipse(0, -19, 5.5, mad ? 4 : 2.8, 0, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(8, -21, 1.1, 0, TAU); g.fill();
+  g.restore();
+}
+function drawEnemyShot(g, e, t) {
+  g.save(); g.translate(e.x, e.y);
+  if (e.kind === "egg") {
+    g.shadowColor = C.red; g.shadowBlur = 8;
+    g.fillStyle = C.ink; g.beginPath(); g.ellipse(0, 0, 5, 6.5, 0, 0, TAU); g.fill();
+    g.shadowBlur = 0; g.strokeStyle = C.red; g.lineWidth = 1.5; g.stroke();
+  } else if (e.kind === "kiss") {
+    g.shadowColor = C.pink; g.shadowBlur = 10; g.fillStyle = C.red;
+    g.beginPath(); g.ellipse(-4, -1.5, 5, 3.4, 0.25, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(4, -1.5, 5, 3.4, -0.25, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(0, 2.5, 7.5, 3.6, 0, 0, TAU); g.fill();
+    g.shadowBlur = 0; g.strokeStyle = C.ink; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(-7, 1); g.quadraticCurveTo(0, 3, 7, 1); g.stroke();
+  } else {
+    const d = Math.hypot(e.vx, e.vy) || 1, r = 4 + Math.sin(t * 24) * 0.8;
+    g.strokeStyle = C.red; g.lineWidth = 4; g.lineCap = "round"; g.globalAlpha = 0.55;
+    g.beginPath(); g.moveTo(-e.vx / d * 16, -e.vy / d * 16); g.lineTo(0, 0); g.stroke();
+    g.globalAlpha = 1; g.shadowColor = C.red; g.shadowBlur = 12;
+    g.fillStyle = C.red; g.beginPath(); g.arc(0, 0, r + 2.5, 0, TAU); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = C.gold; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+    g.fillStyle = C.ink; g.beginPath(); g.arc(0, 0, r * 0.5, 0, TAU); g.fill();
+  }
+  g.restore();
+}
 function drawIcons() {
   document.querySelectorAll("canvas[data-icon]").forEach((c) => {
     const k = c.dataset.icon, r = c.getBoundingClientRect();
@@ -431,6 +546,12 @@ function drawIcons() {
     if (k === "drone" || k === "hornet" || k === "choker") {
       const z = k === "choker" ? 0.78 : 1;
       g.scale(z, z); drawBug(g, k, 0, k === "choker" ? -1 : 1, 0.3, false, false);
+    } else if (k === "rooster") {
+      g.scale(0.42, 0.42); drawRooster(g, 2, 6, 0.2, 1, false);
+    } else if (k === "tit") {
+      g.scale(1.1, 1.1); drawTit(g, -1, 0, 0.1, 1, false);
+    } else if (k === "bertha") {
+      g.scale(0.29, 0.29); drawBertha(g, 0, 8, 0, false, false);
     } else {
       g.scale(1.15, 1.15); drawDrop(g, k, 0, 0, 0);
     }
@@ -482,8 +603,9 @@ function newState() {
     player: { x: W / 2, y: H - 74, inv: 1.5 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
     turbo: 0, crash: 0, escort: null, beamer: null,
+    flyers: [], flyTimer: 8, flyKind: "tit", seen: {}, boss: null, bossCount: 0,
     diveTimer: 3, nextWave: 0, banner: null, shake: 0, overT: 0, brokeQuoted: false,
-    stats: { kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0 },
+    stats: { kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0 },
   };
 }
 const slotX = (b) => 54 + b.col * 36 + S.sway;
@@ -528,6 +650,121 @@ function enemyShoot(b) {
   const P = S.player, sp = 190 + S.wave * 14;
   const dx = P.x - b.x, dy = P.y - b.y, d = Math.hypot(dx, dy) || 1;
   S.ebullets.push({ x: b.x, y: b.y + 8, vx: (dx / d) * sp * 0.55, vy: Math.max(dy / d, 0.6) * sp });
+  burst(b.x, b.y + 8, C.red, 5); sfx.eshot();
+}
+
+// ---------- flybys: great tits (bonus) and the huge rooster (drops eggs) ----------
+function spawnFlyby(kind) {
+  const dir = Math.random() < 0.5 ? 1 : -1, x0 = dir > 0 ? -40 : W + 40;
+  if (kind === "rooster") {
+    S.flyers.push({ kind, dir, x: x0, y: 296, baseY: 296, vx: 46 * dir, hp: 6, flash: 0, ph: 0, eggCd: 1.4 });
+    sfx.crow();
+    if (!S.seen.rooster) { S.seen.rooster = true; banner("Huge cock incoming", "Zach asked for it. It's a rooster. $10.", C.red); }
+  } else {
+    for (let i = 0; i < 5; i++) {
+      const baseY = 340 + (i % 2) * 16;
+      S.flyers.push({ kind: "tit", dir, x: x0 - dir * i * 26, y: baseY, baseY, vx: 100 * dir, hp: 1, flash: 0, ph: i * 1.3 });
+    }
+    sfx.tweet();
+    if (!S.seen.tit) { S.seen.tit = true; banner("More tiddies", "Great tits. They're birds, Jeremy. $3 each.", C.gold); }
+  }
+}
+function updateFlyers(dt) {
+  const P = S.player;
+  for (const f of S.flyers) {
+    f.flash = Math.max(0, f.flash - dt);
+    f.x += f.vx * dt;
+    f.y = f.baseY + (f.kind === "tit" ? Math.sin(S.t * 5 + f.ph) * 12 : 0);
+    if (f.kind === "rooster" && S.mode === "play") {
+      f.eggCd -= dt;
+      if (f.eggCd <= 0 && f.x > 20 && f.x < W - 20) {
+        f.eggCd = 1.25;
+        S.ebullets.push({ kind: "egg", x: f.x, y: f.y + 16, vx: clamp((P.x - f.x) * 0.35, -60, 60), vy: 165 });
+      }
+    }
+    if (f.vx > 0 ? f.x > W + 60 : f.x < -60) f.dead = true;
+  }
+}
+function hitFlyer(f) {
+  f.hp--; f.flash = 0.08;
+  if (f.hp > 0) { sfx.tink(); return; }
+  f.dead = true;
+  const rooster = f.kind === "rooster", v = rooster ? 1000 : 300;
+  S.cents += v;
+  if (rooster) S.stats.cocks++; else S.stats.tits++;
+  pop("+" + money(v), f.x, f.y, C.gold, rooster ? 20 : 15);
+  burst(f.x, f.y, rooster ? C.ink : C.gold, rooster ? 26 : 10);
+  if (rooster) { burst(f.x, f.y, C.red, 10); sfx.crow(); } else sfx.tweet();
+}
+
+// ---------- the boss ----------
+const BOSS_Y = 172;
+function spawnBoss() {
+  S.bossCount++;
+  const hp = 45 + (S.bossCount - 1) * 25;
+  S.boss = { x: W / 2, y: -70, hp, maxHp: hp, ft: 0, state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0 };
+  S.bugs = [];
+  banner("Final boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy.", C.pink);
+  sfx.warn();
+}
+function bossAttack(B) {
+  const P = S.player, mad = B.hp < B.maxHp / 2, kind = B.atk++ % 3;
+  if (kind === 0) {
+    const base = Math.atan2(P.y - B.y, P.x - B.x), n = mad ? 7 : 5, sp = 185 + S.bossCount * 15;
+    for (let i = 0; i < n; i++) {
+      const a = base + (i - (n - 1) / 2) * 0.2;
+      S.ebullets.push({ x: B.x, y: B.y + 30, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp });
+    }
+    burst(B.x, B.y + 30, C.red, 8); sfx.eshot();
+  } else if (kind === 1) {
+    for (const off of mad ? [-40, 0, 40] : [-28, 28]) {
+      S.ebullets.push({ kind: "kiss", x: B.x + off, y: B.y + 10, vx: 0, vy: 105, home: 55 });
+    }
+    sfx.kiss();
+  } else {
+    spawnFlyby("rooster");
+  }
+}
+function updateBoss(dt) {
+  const B = S.boss;
+  if (!B) return;
+  B.flash = Math.max(0, B.flash - dt);
+  if (B.state === "enter") {
+    B.y = Math.min(BOSS_Y, B.y + 120 * dt);
+    if (B.y >= BOSS_Y) B.state = "fight";
+    return;
+  }
+  if (B.state === "dying") {
+    B.dieT -= dt;
+    if (Math.random() < dt * 14) burst(B.x + rand(-40, 40), B.y + rand(-50, 40), pick([C.pink, C.gold, C.ink]), 10);
+    if (B.dieT <= 0) finishBoss(B);
+    return;
+  }
+  B.ft += dt;
+  B.x = W / 2 + Math.sin(B.ft * 0.7) * 105;
+  B.y = BOSS_Y + Math.sin(B.ft * 1.9) * 8;
+  if (S.mode !== "play") return;
+  B.atkCd -= dt;
+  if (B.atkCd <= 0) {
+    bossAttack(B);
+    B.atkCd = (B.hp < B.maxHp / 2 ? 1.7 : 2.2) - Math.min(0.5, (S.bossCount - 1) * 0.15);
+  }
+}
+function hitBoss(B) {
+  B.hp--; B.flash = 0.06;
+  if (B.hp > 0) { if (B.hp % 3 === 0) sfx.tink(); return; }
+  B.state = "dying"; B.dieT = 1.4;
+  S.ebullets = [];
+  S.shake = 0.6; sfx.boom();
+}
+function finishBoss(B) {
+  burst(B.x, B.y, C.pink, 40); burst(B.x, B.y, C.gold, 30);
+  S.cents += 5000; S.stats.bosses++;
+  pop("+$50.00", B.x, B.y, C.gold, 26);
+  S.escort = { x: B.x, y: B.y, life: 20, cd: 0, tick: 0, free: true };
+  S.boss = null;
+  banner("Bertha's down", "The hot one is free. She fights for you, no charge.", C.gold);
+  sfx.power();
 }
 function hitBug(b) {
   b.hp--; b.flash = 0.08;
@@ -553,6 +790,7 @@ function collect(kind) {
     S.stats.bags++; S.turbo = Math.min(12, S.turbo + 6); S.crash = 0;
     pop("*SNIFF*", P.x, P.y - 30, C.ink, 20); sfx.sniff();
   } else if (kind === "card") {
+    if (S.escort && S.escort.free) { pop("You've already got the hot one", P.x, P.y - 34, C.gold, 15); return; }
     if (S.cents <= 0) { pop("She saw your bank account", P.x, P.y - 34, C.pink, 15); return; }
     S.escort = { x: P.x - 36, y: P.y + 4, life: 15, cd: 0, tick: 0 };
     S.stats.escorts++;
@@ -597,6 +835,7 @@ function updatePlayer(dt) {
 function updateBugs(dt) {
   const P = S.player;
   for (const b of S.bugs) {
+    b.warn = false;
     b.flash = Math.max(0, b.flash - dt);
     if (b.delay > 0) { b.delay -= dt; continue; }
     const sx = slotX(b), sy = slotY(b);
@@ -613,6 +852,7 @@ function updateBugs(dt) {
       const q = b.path, t = Math.min(1, b.p);
       b.x = bez3(q[0], q[2], q[4], q[6], t); b.y = bez3(q[1], q[3], q[5], q[7], t);
       if (b.state === "dive") {
+        b.warn = b.shotsLeft.length > 0 && t >= b.shotsLeft[0] - 0.14 && b.y > 0 && b.y < H * 0.72;
         while (b.shotsLeft.length && t >= b.shotsLeft[0]) { b.shotsLeft.shift(); enemyShoot(b); }
         if (b.p >= 1) { b.state = "return"; b.p = 0; b.x = sx; b.y = -30; b.rx = sx; b.ry = -30; }
       } else if (b.p >= 1) {
@@ -676,22 +916,37 @@ function update(dt) {
 
   if (S.mode === "play") updatePlayer(dt);
   updateBugs(dt);
+  if (S.mode === "play" && !S.boss) {
+    S.flyTimer -= dt;
+    if (S.flyTimer <= 0) {
+      spawnFlyby(S.flyKind);
+      S.flyKind = S.flyKind === "tit" ? "rooster" : "tit";
+      S.flyTimer = rand(12, 17);
+    }
+  }
+  updateBoss(dt);
+  updateFlyers(dt);
 
   for (const s of S.bullets) s.y += s.vy * dt;
-  for (const e of S.ebullets) { e.x += e.vx * dt; e.y += e.vy * dt; }
+  for (const e of S.ebullets) {
+    if (e.home) e.vx = clamp(e.vx + Math.sign(P.x - e.x) * e.home * 2 * dt, -e.home, e.home);
+    e.x += e.vx * dt; e.y += e.vy * dt;
+  }
   for (const d of S.drops) d.y += d.vy * dt;
 
   const E = S.escort;
   if (E) {
     const side = P.x < 60 ? 1 : -1;
-    E.x += (P.x + side * 36 - E.x) * Math.min(1, dt * 6); E.y = P.y + 4;
+    E.x += (P.x + side * 36 - E.x) * Math.min(1, dt * 6); E.y += (P.y + 4 - E.y) * Math.min(1, dt * 6);
     E.cd -= dt;
-    if (E.cd <= 0 && S.mode === "play") { S.bullets.push({ x: E.x, y: E.y - 12, vy: -470, heart: true }); E.cd = 0.3; }
-    E.tick += dt;
-    while (E.tick >= 0.25) { E.tick -= 0.25; S.cents -= 25; S.stats.escortCents += 25; }
+    if (E.cd <= 0 && S.mode === "play") { S.bullets.push({ x: E.x, y: E.y - 12, vy: -470, heart: true, gold: E.free }); E.cd = E.free ? 0.16 : 0.3; }
+    if (!E.free) {
+      E.tick += dt;
+      while (E.tick >= 0.25) { E.tick -= 0.25; S.cents -= 25; S.stats.escortCents += 25; }
+    }
     E.life -= dt;
-    if (S.cents < 0) { pop("She left. You're broke.", E.x, E.y - 24, C.pink, 15); S.escort = null; }
-    else if (E.life <= 0) { pop("Time's up, sugar.", E.x, E.y - 24, C.pink, 15); S.escort = null; }
+    if (!E.free && S.cents < 0) { pop("She left. You're broke.", E.x, E.y - 24, C.pink, 15); S.escort = null; }
+    else if (E.life <= 0) { pop(E.free ? "The hot one has other plans." : "Time's up, sugar.", E.x, E.y - 24, C.pink, 15); S.escort = null; }
   }
 
   for (const s of S.bullets) {
@@ -700,6 +955,15 @@ function update(dt) {
       const r = b.type === "choker" ? 15 : 12;
       if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; hitBug(b); }
     }
+    for (const f of S.flyers) {
+      if (s.dead || f.dead) continue;
+      const hit = f.kind === "rooster"
+        ? Math.abs(s.x - f.x) < 26 && s.y > f.y - 36 && s.y < f.y + 22
+        : Math.abs(s.x - f.x) < 12 && Math.abs(s.y - f.y) < 11;
+      if (hit) { s.dead = true; hitFlyer(f); }
+    }
+    const B = S.boss;
+    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < 40 && s.y > B.y - 58 && s.y < B.y + 44) { s.dead = true; hitBoss(B); }
   }
 
   if (S.mode === "play") {
@@ -708,7 +972,13 @@ function update(dt) {
     }
     if (P.inv <= 0) {
       for (const e of S.ebullets) {
-        if (Math.abs(e.x - P.x) < 7 && Math.abs(e.y - P.y) < 12) { e.dead = true; hurt("Shot down", pick(SHOT_LINES)); break; }
+        if (Math.abs(e.x - P.x) < (e.kind === "kiss" ? 11 : 7) && Math.abs(e.y - P.y) < 12) {
+          e.dead = true;
+          if (e.kind === "kiss") hurt("Kiss of death", "Bertha got you. Lipstick everywhere.");
+          else if (e.kind === "egg") hurt("Egged", "Taken out by a huge cock. Tell no one.");
+          else hurt("Shot down", pick(SHOT_LINES));
+          break;
+        }
       }
     }
     if (P.inv <= 0) {
@@ -727,15 +997,20 @@ function update(dt) {
   S.bullets = S.bullets.filter((s) => !s.dead && s.y > -20);
   S.ebullets = S.ebullets.filter((e) => !e.dead && e.y < H + 20 && e.x > -20 && e.x < W + 20);
   S.drops = S.drops.filter((d) => !d.dead && d.y < H + 20);
+  S.flyers = S.flyers.filter((f) => !f.dead);
   updateFx(dt);
 
-  if (S.mode === "play" && S.bugs.length === 0) {
+  if (S.mode === "play" && S.bugs.length === 0 && !S.boss) {
     if (S.nextWave <= 0) S.nextWave = 1.6;
     else {
       S.nextWave -= dt;
       if (S.nextWave <= 0) {
-        S.wave++; spawnWave();
-        banner(`Wave ${S.wave}`, WAVE_LINES[(S.wave - 2) % WAVE_LINES.length], C.cyan);
+        S.wave++;
+        if (S.wave % 3 === 0) spawnBoss();
+        else {
+          spawnWave();
+          banner(`Wave ${S.wave}`, WAVE_LINES[(S.wave - 2) % WAVE_LINES.length], C.cyan);
+        }
       }
     }
   }
@@ -787,15 +1062,26 @@ function drawHUD(g) {
   for (let i = 0; i < Math.min(S.lives, 6); i++) {
     g.save(); g.translate(W - 20 - i * 18, 38); g.scale(0.55, 0.55); drawPlayer(g, 0, 0, 0, false); g.restore();
   }
-  g.textAlign = "center"; g.font = `17px ${FONT_HUD}`;
+  g.textAlign = "center";
   let y = 68;
+  if (S.boss) {
+    const B = S.boss, bw = 220, bx = (W - bw) / 2;
+    g.font = `11px ${FONT_SIGN}`; g.fillStyle = C.pink; g.fillText("BIG BERTHA", W / 2, 64);
+    g.fillStyle = C.deep; g.fillRect(bx, 79, bw, 7);
+    g.fillStyle = B.hp < B.maxHp / 2 ? C.red : C.pink; g.fillRect(bx, 79, bw * Math.max(0, B.hp / B.maxHp), 7);
+    g.strokeStyle = C.dim; g.lineWidth = 1; g.strokeRect(bx, 79, bw, 7);
+    y = 92;
+  }
+  g.font = `17px ${FONT_HUD}`;
   if (S.turbo > 0) {
     g.fillStyle = C.pink;
     g.fillText(`NOSE CANDY TURBO ${S.turbo.toFixed(1)}s · ${Math.round(110 + S.turbo * 9)} BPM`, W / 2, y); y += 16;
   } else if (S.crash > 0) {
     g.fillStyle = C.dim; g.fillText("THE CRASH · everything is slow", W / 2, y); y += 16;
   }
-  if (S.escort) {
+  if (S.escort && S.escort.free) {
+    g.fillStyle = C.gold; g.fillText(`THE HOT ONE · on the house · ${Math.ceil(S.escort.life)}s`, W / 2, y);
+  } else if (S.escort) {
     g.fillStyle = C.pink; g.fillText(`ESCORT ON THE CLOCK · -$1.00/s · ${Math.ceil(S.escort.life)}s`, W / 2, y);
   }
 }
@@ -806,7 +1092,7 @@ function drawBanner(g) {
   g.textAlign = "center"; g.textBaseline = "middle";
   g.font = `22px ${FONT_SIGN}`;
   const lines = wrap(g, b.title.toUpperCase(), 316);
-  let y = H * 0.46 - (lines.length - 1) * 13;
+  let y = H * 0.6 - (lines.length - 1) * 13;
   g.shadowColor = b.color; g.shadowBlur = 14; g.fillStyle = b.color;
   for (const l of lines) { g.fillText(l, W / 2, y); y += 26; }
   g.shadowBlur = 0;
@@ -827,15 +1113,25 @@ function render() {
   if (!S) return;
 
   for (const b of S.bugs) if (b.state === "beam") drawBeam(ctx, b);
-  for (const b of S.bugs) if (b.delay <= 0) drawBug(ctx, b.type, b.x, b.y, S.t + b.ph, b.flash > 0, b.type === "choker" && b.hp < 2);
+  for (const b of S.bugs) {
+    if (b.delay > 0) continue;
+    drawBug(ctx, b.type, b.x, b.y, S.t + b.ph, b.flash > 0, b.type === "choker" && b.hp < 2);
+    if (b.warn) {
+      ctx.font = `20px ${FONT_SIGN}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = Math.floor(S.t * 20) % 2 ? C.red : C.ink; ctx.fillText("!", b.x, b.y - 24);
+    }
+  }
+  if (S.boss) drawBertha(ctx, S.boss.x, S.boss.y, S.t, S.boss.flash > 0, S.boss.hp < S.boss.maxHp / 2);
+  for (const f of S.flyers) {
+    if (f.kind === "rooster") drawRooster(ctx, f.x, f.y, S.t, f.dir, f.flash > 0);
+    else drawTit(ctx, f.x, f.y, S.t + f.ph, f.dir, f.flash > 0);
+  }
   for (const d of S.drops) drawDrop(ctx, d.kind, d.x, d.y, S.t);
   for (const s of S.bullets) {
-    if (s.heart) drawHeart(ctx, s.x, s.y, 4.5, C.pink);
+    if (s.heart) drawHeart(ctx, s.x, s.y, 4.5, s.gold ? C.gold : C.pink);
     else { ctx.fillStyle = S.turbo > 0 ? C.pink : C.cyan; ctx.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   }
-  ctx.fillStyle = C.red;
-  for (const e of S.ebullets) { ctx.beginPath(); ctx.arc(e.x, e.y, 3.2, 0, TAU); ctx.fill(); }
-  if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t);
+  if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t, S.escort.free);
   const P = S.player;
   if (S.mode === "play" && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) drawPlayer(ctx, P.x, P.y, S.t, S.turbo > 0);
   for (const p of S.parts) { ctx.globalAlpha = Math.min(1, p.life * 2); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
@@ -858,7 +1154,11 @@ function render() {
     ctx.fillStyle = p.color; ctx.fillText(p.text, clamp(p.x, half, W - half), p.y);
   }
   ctx.globalAlpha = 1;
-  if (S.mode !== "over") { drawHUD(ctx); drawBanner(ctx); }
+  if (S.mode !== "over") {
+    drawHUD(ctx); drawBanner(ctx);
+    // Enemy shots go on top of everything so a banner can never hide one.
+    for (const e of S.ebullets) drawEnemyShot(ctx, e, S.t);
+  }
 }
 
 // ---------- screens ----------
@@ -880,8 +1180,10 @@ function showOver() {
     ["Texting bill", `${money(S.billCents)} · ${S.shots} shots`],
     ["Nose candy", `${S.stats.bags} bags`],
     ["Escorts hired", `${S.stats.escorts} · ${money(S.stats.escortCents)}`],
-    ["Choked out", `${S.stats.chokes} times`],
+    ["Choked out", `${S.stats.chokes} time${S.stats.chokes === 1 ? "" : "s"}`],
+    ["Cocks / tits bagged", `${S.stats.cocks} / ${S.stats.tits}`],
   ];
+  if (S.stats.bosses) rows.push(["Big Bertha beaten", `${S.stats.bosses}x`]);
   if (S.stats.cody) rows.push(["Navy SEAL rescues", S.stats.cody]);
   $("stats").replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement("dt"); dt.textContent = k;
@@ -900,6 +1202,8 @@ function start() {
   ensureAudio();
   S = newState(); spawnWave();
   banner("Wave 1", "Every shot costs ten cents.", C.cyan);
+  // Shortcut for testing the boss: open the page with #bertha on the end of the link.
+  if (location.hash === "#bertha") { S.wave = 2; S.bugs = []; }
   input.target = W / 2; input.touchFire = false; input.dragging = false;
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true;
 }
