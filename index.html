@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v24</span>
+  <span id="ver">v25</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1771,7 +1771,7 @@ function updatePlayer(dt) {
   if (input.right) target = 1e4;
   P.x = clamp(P.x + clamp(target - P.x, -spd * dt, spd * dt), edgeX(), W - edgeX());
   if (!input.dragging) input.target = P.x;
-  let targetY = input.dragging ? input.targetY : P.y;
+  let targetY = input.dragging ? input.targetY : gyro.on ? gyroTargetY() : P.y;
   if (input.up) targetY = -1e4;
   if (input.down) targetY = 1e4;
   P.y = clamp(P.y + clamp(targetY - P.y, -spd * dt, spd * dt), Y_MIN, Y_MAX);
@@ -2773,6 +2773,7 @@ function start() {
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
   fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
+  gyro.rest = null;
   // An iPhone asks permission for tilt with a system prompt; the game waits behind it rather than starting without a pilot.
   if (gyro.wanted && !gyro.on && TILT_OK) { asking = true; setGyro(true).finally(() => { asking = false; last = performance.now(); }); }
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
@@ -2955,25 +2956,33 @@ $("play").addEventListener("click", start);
 $("again").addEventListener("click", start);
 // ---------- tilt steering: an opt-in setting on the thumb pad, for playing without touching the screen ----------
 // Tip the phone left or right and the ship goes there; level is the middle, 18 degrees is the wall.
+// Tip it forward (top edge away from you) and the ship climbs; tip it back and it comes down. However the phone is held
+// when a game begins counts as the bottom, the first 3 degrees forward do nothing, and 17 degrees is the top of the ship's room.
 // Hold the Fire button to shoot, or tap it once to lock the guns on and play without touching the screen.
 // A finger on the screen still wins while it is down.
 const fireBtn = $("fire");
-const gyro = { on: false, g: 0, seen: false, wanted: store.get("sd-tilt", false) };
+const gyro = { on: false, g: 0, b: 0, rest: null, seen: false, wanted: store.get("sd-tilt", false) };
 const tiltBtn = $("tilt"), padHint = $("padHint");
 const TILT_OK = typeof DeviceOrientationEvent !== "undefined";
 const gyroTarget = () => W / 2 + clamp(gyro.g / 18, -1, 1) * (W / 2 - 16);
+// A phone that reports no forward-and-back reading leaves the ship at whatever height it is.
+const gyroTargetY = () => (gyro.rest === null ? S.player.y : Y_MAX - clamp((gyro.rest - gyro.b - 3) / 14, 0, 1) * (Y_MAX - Y_MIN));
 function syncGyro(note) {
   tiltBtn.hidden = !TILT_OK;
   tiltBtn.textContent = gyro.on ? "Back to dragging" : "Steer by tilting";
   tiltBtn.setAttribute("aria-pressed", String(gyro.on));
   padHint.textContent = note || (gyro.on
-    ? "Tilt steering is on. Tip left and right.\nHold Fire to shoot, or tap it to lock it."
+    ? "Tilt steering is on. Tip it any way to fly.\nHold Fire to shoot, or tap it to lock it."
     : "Thumb goes down here.\nDrag anywhere to fly and shoot.");
 }
 addEventListener("deviceorientation", (e) => {
   if (typeof e.gamma !== "number") return;
   gyro.seen = true;
   gyro.g += (e.gamma - gyro.g) * 0.3;
+  // Forward and back. The first reading after tilt comes on, or after a new game starts, is how the phone is held at rest.
+  if (typeof e.beta !== "number") return;
+  if (gyro.rest === null) gyro.rest = gyro.b = e.beta;
+  else gyro.b += (e.beta - gyro.b) * 0.3;
 });
 // iPhones only hand over tilt after a tap and a yes from the player, so this always runs from a button press.
 async function setGyro(on) {
@@ -2982,7 +2991,7 @@ async function setGyro(on) {
     try { answer = await DeviceOrientationEvent.requestPermission(); } catch {}
     if (answer !== "granted") { gyro.wanted = false; store.set("sd-tilt", false); syncGyro("Tilt was blocked.\nAllow motion access, then try again."); return; }
   }
-  gyro.on = on; gyro.wanted = on; gyro.seen = false; store.set("sd-tilt", on);
+  gyro.on = on; gyro.wanted = on; gyro.seen = false; gyro.rest = null; store.set("sd-tilt", on);
   shownAt = performance.now();
   // Tilt starts with the guns unlocked (hold to fire); dragging starts with them on.
   fireOn = !on; input.holdFire = false;
