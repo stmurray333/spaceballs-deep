@@ -109,8 +109,10 @@ body.thumb #pad {
 .tag em { font-style: normal; color: var(--gold); }
 .legend {
   display: grid; grid-template-columns: 1fr 1fr; width: 100%;
-  gap: calc(var(--u) * 9) calc(var(--u) * 10); text-align: left;
+  gap: calc(var(--u) * 4) calc(var(--u) * 10); text-align: left;
 }
+/* Sixteen things to explain now, so the title screen's blocks sit a little closer together than the other screens'. */
+#title { gap: calc(var(--u) * 10); }
 .item { display: flex; align-items: center; gap: calc(var(--u) * 7); min-width: 0; }
 .item canvas { width: calc(var(--u) * 30); height: calc(var(--u) * 30); flex: none; }
 .item div { min-width: 0; }
@@ -252,6 +254,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
       <div class="item"><canvas data-icon="bertha" aria-hidden="true"></canvas><div><b>Bosses</b><span>One every 3 waves</span></div></div>
       <div class="item"><canvas data-icon="beer" aria-hidden="true"></canvas><div><b>Booze</b><span>More pay and power</span></div></div>
       <div class="item"><canvas data-icon="cop" aria-hidden="true"></canvas><div><b>DUI checkpoint</b><span>Dodge the light</span></div></div>
+      <div class="item"><canvas data-icon="whiskey" aria-hidden="true"></canvas><div><b>Whiskey</b><span>Three beers in one</span></div></div>
+      <div class="item"><canvas data-icon="pill" aria-hidden="true"></canvas><div><b>Boner pills</b><span>Three escorts, free</span></div></div>
       <div class="item"><canvas data-icon="rubber" aria-hidden="true"></canvas><div><b>Rubber</b><span>Blocks her STDs</span></div></div>
       <div class="item"><canvas data-icon="clinic" aria-hidden="true"></canvas><div><b>Free clinic</b><span>Cure. $20 co-pay</span></div></div>
       <div class="item"><canvas data-icon="eighth" aria-hidden="true"></canvas><div><b>Dime bags</b><span>And eighths: slo-mo</span></div></div>
@@ -303,7 +307,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v31</span>
+  <span id="ver">v32</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -556,6 +560,21 @@ function drawDrop(g, kind, x, y, t) {
     g.fillStyle = C.pink; g.fillRect(-10, -6.5, 20, 13);
     g.shadowBlur = 0; g.strokeStyle = C.gold; g.lineWidth = 1; g.strokeRect(-8.5, -5, 17, 10);
     drawHeart(g, 0, 0.5, 3, C.gold);
+  } else if (kind === "whiskey") {
+    // A bottle of the brown stuff: square shoulders, a short neck, a cap and a label.
+    g.shadowColor = C.orange; g.shadowBlur = 10;
+    g.fillStyle = C.orange; g.fillRect(-6.5, -3, 13, 14); g.fillRect(-2.5, -9, 5, 7);
+    g.shadowBlur = 0;
+    g.fillStyle = C.brown; g.fillRect(-3.5, -12, 7, 3.5);
+    g.fillStyle = C.ink; g.fillRect(-5, 1, 10, 6.5);
+    g.fillStyle = C.void; g.fillRect(-3.5, 2.6, 7, 1.2); g.fillRect(-3.5, 4.8, 7, 1.2);
+  } else if (kind === "pill") {
+    // A gas station boner pill: a blue lozenge with an arrow that only points one way.
+    g.rotate(Math.sin(t * 3) * 0.12);
+    g.shadowColor = C.blue; g.shadowBlur = 10;
+    g.fillStyle = C.blue; g.beginPath(); g.moveTo(0, -11); g.lineTo(9.5, 0); g.lineTo(0, 11); g.lineTo(-9.5, 0); g.closePath(); g.fill();
+    g.shadowBlur = 0; g.strokeStyle = C.ink; g.lineWidth = 2.2; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(0, 5.5); g.lineTo(0, -5.5); g.moveTo(-3.8, -1.7); g.lineTo(0, -5.5); g.lineTo(3.8, -1.7); g.stroke();
   } else if (kind === "beer") {
     g.strokeStyle = C.gold; g.lineWidth = 2.5; g.beginPath(); g.arc(5, 2, 4.5, -Math.PI / 2, Math.PI / 2); g.stroke();
     g.shadowColor = C.gold; g.shadowBlur = 10;
@@ -1175,7 +1194,7 @@ function newState() {
     mode: "play", t: 0, wt: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, mug: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
+    turbo: 0, crash: 0, escort: null, hard: 0, girls: [], leaveCd: 0, beamer: null, heat: 0, hot: false, dual: false, rescue: null, mug: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1183,7 +1202,7 @@ function newState() {
     diveTimer: 3, nextWave: 0, banner: null, shake: 0, overT: 0, brokeQuoted: false,
     stats: {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
-      beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
+      beers: 0, whiskeys: 0, pills: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
       tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0, robbed: 0, robbedCents: 0,
     },
@@ -1529,6 +1548,8 @@ function hitBug(b, dmg = 1, quiet = false) {
   else if (r < 0.32 && sick() && !S.drops.some((d) => d.kind === "clinic")) kind = "clinic";
   else if (r < 0.36) kind = "dime";
   else if (r < 0.375) kind = "eighth";
+  else if (r < 0.4) kind = "whiskey";
+  else if (r < 0.415 && !S.girls.length && !S.drops.some((d) => d.kind === "pill")) kind = "pill";
   // Waffle House employee training, as ordered by Jeremy: rare, and only when it has got wild out there.
   // Wild means the enemy shots in the air plus twice the bugs in a dive or a beam come to WILD or more. At most one a wave.
   if (S.waffleWave !== S.wave && wildness() >= WILD && Math.random() < 0.06) { kind = "waffle"; S.waffleWave = S.wave; }
@@ -1549,6 +1570,10 @@ function collect(kind) {
     banner("Escort hired", "Velvet Escort Service. $1 a second.", C.pink); sfx.power();
   } else if (kind === "beer") {
     drink();
+  } else if (kind === "whiskey") {
+    drink(3);
+  } else if (kind === "pill") {
+    pill();
   } else if (kind === "rubber") {
     if (S.rubbers >= 3) { pop("Pockets are full", P.x, P.y - 34, C.cyan, 15); return; }
     S.rubbers++;
@@ -1586,6 +1611,35 @@ function hurt(title, sub) {
   burst(P.x, P.y, C.gold, 26); sfx.hurt();
   banner(title, sub, C.red);
   if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; S.realm = null; input.touchFire = false; }
+}
+
+// ---------- gas station boner pills, as ordered by Jeremy ----------
+// A pill brings three escorts at once, on the house, for as long as it lasts. They fly in formation and shoot.
+// When it wears off they leave one at a time, each the way any escort leaves: a rubber each, or you take your chances.
+const PILL = { life: 15, slots: [[-40, 6], [40, 6], [0, 30]], gap: 0.45 };
+function pill() {
+  const P = S.player, topUp = S.hard > 0;
+  S.stats.pills++; S.hard = PILL.life;
+  if (!topUp) S.girls = PILL.slots.map(([dx], i) => ({ x: clamp(P.x + dx * 2, 12, W - 12), y: H + 24 + i * 14, cd: 0.4 + i * 0.1 }));
+  pop("*ROCK HARD*", P.x, P.y - 30, C.blue, 20); sfx.power();
+  if (!S.seen.pill) { S.seen.pill = true; banner("Gas station boner pills", "Three escorts, on the house. Hope you packed three rubbers.", C.blue); }
+  else pop(topUp ? "Still going" : "Three more, on the house", P.x, P.y - 52, C.pink, 15);
+}
+function updateGirls(dt) {
+  if (!S.girls.length) return;
+  const P = S.player, on = S.hard > 0;
+  if (on) S.hard = Math.max(0, S.hard - dt);
+  S.girls.forEach((G, i) => {
+    const [dx, dy] = PILL.slots[i];
+    G.x += (clamp(P.x + dx, 12, W - 12) - G.x) * Math.min(1, dt * 6); G.y += (Math.min(H - 18, P.y + dy) - G.y) * Math.min(1, dt * 6);
+    G.cd -= dt;
+    if (on && G.cd <= 0 && S.mode === "play") { S.bullets.push({ x: G.x, y: G.y - 12, vy: -470, heart: true }); G.cd = 0.3; }
+  });
+  if (on && S.hard <= 0) { pop("It wore off", P.x, P.y - 30, C.blue, 18); S.leaveCd = PILL.gap; }
+  if (S.hard <= 0) {
+    S.leaveCd -= dt;
+    if (S.leaveCd <= 0) { const G = S.girls.pop(); S.leaveCd = PILL.gap; afterEscort(G, S.girls.length * 18); }
+  }
 }
 
 // ---------- the mugging: a prank, by order of Stephen, who says it is coming out again later ----------
@@ -1767,12 +1821,16 @@ function wobble() {
   if (S.std.crabs) w += Math.sin(S.t * 27) * 4 + Math.sin(S.t * 43) * 2;
   return w;
 }
-function drink() {
-  const P = S.player, was = drunkLevel();
-  S.stats.beers++; S.drinks += 1; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
+// A beer is one drink. A whiskey is three of them at once, as ordered by Jeremy, with everything three beers bring.
+function drink(n = 1) {
+  const P = S.player, was = drunkLevel(), whiskey = n > 1;
+  if (whiskey) S.stats.whiskeys++; else S.stats.beers++;
+  S.drinks += n; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
   S.stats.peakBac = Math.max(S.stats.peakBac, bac());
-  pop(`*GLUG* pay and power x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
-  if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more and your shots hit harder when you're drunk. Your aim does not improve.", C.gold); }
+  pop(`${whiskey ? "*WHISKEY*" : "*GLUG*"} pay and power x${payMult()}`, P.x, P.y - 30, whiskey ? C.orange : C.gold, 20); sfx.glug();
+  if (whiskey && S.seen.whiskey) pop("Three beers in one", P.x, P.y - 52, C.orange, 15);
+  if (whiskey && !S.seen.whiskey) { S.seen.whiskey = true; S.seen.beer = true; banner("Whiskey", "Counts as three beers: triple the pay, triple the trouble.", C.orange); }
+  else if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more and your shots hit harder when you're drunk. Your aim does not improve.", C.gold); }
   // Jeremy's pop-ups: when things go sideways, say what to grab next.
   else if (was < 3 && drunkLevel() === 3 && S.drinks <= 4 && !wired()) {
     if (S.hamWave !== S.wave) { S.hamWave = S.wave; card("hammered"); }
@@ -1794,7 +1852,7 @@ function breathalyzer(f) {
   } else pop(S.drinks > 0 ? `Blew a ${bacText()}. Free to go.` : "Sober. Move along.", P.x, P.y - 34, C.cyan, 16);
 }
 // What she left behind. A rubber stops it, unless you're too drunk to find the rubber.
-function afterEscort(E) {
+function afterEscort(E, lift = 0) {
   if (S.mode !== "play") return;
   const P = S.player, drunk = bac() >= 8;
   const open = Object.keys(STD).filter((k) => !S.std[k]);
@@ -1802,7 +1860,7 @@ function afterEscort(E) {
   // A rubber in your pocket always gets used. (It used to be forgotten when drunk, which read as a bug with three in hand.)
   if (S.rubbers > 0) {
     S.rubbers--; S.stats.rubbersUsed++;
-    pop(open.length < 3 ? "Wrapped it. Nothing new." : "Wrapped it. You're clean.", P.x, P.y - 52, C.lime, 16);
+    pop(open.length < 3 ? "Wrapped it. Nothing new." : "Wrapped it. You're clean.", P.x, P.y - 52 - lift, C.lime, 16);
     return;
   }
   if (Math.random() >= (drunk ? 1 : E.free ? 0.4 : 0.65)) return;
@@ -1811,7 +1869,7 @@ function afterEscort(E) {
   if (!S.stats.stds.includes(name)) S.stats.stds.push(name);
   if (k === "herpes") { S.flare = 0; S.flareCd = 5; S.dormant = 0; }
   // A banner that only just went up (the DUI that scared her off, say) keeps the stage; this rides along as a pop.
-  if (S.banner && S.banner.max - S.banner.life < 0.6) pop(title, P.x, P.y - 52, C.lime, 18);
+  if (S.banner && S.banner.max - S.banner.life < 0.6) pop(title, P.x, P.y - 52 - lift, C.lime, 18);
   else banner(title, sub, C.lime);
   sfx.sick();
 }
@@ -2075,6 +2133,7 @@ function update(dt) {
     if (!E.free && !E.comp && S.cents < 0) { pop("She left. You're broke.", E.x, E.y - 24, C.pink, 15); S.escort = null; afterEscort(E); }
     else if (E.life <= 0) { pop(E.free ? "The hot one has other plans." : "Time's up, sugar.", E.x, E.y - 24, C.pink, 15); S.escort = null; afterEscort(E); }
   }
+  updateGirls(dt);
 
   for (const s of S.bullets) {
     for (const b of S.bugs) {
@@ -2244,6 +2303,7 @@ function drawHUD(g) {
   else if (S.crash > 0) boosts.push(["THE CRASH · everything is slow", "CRASH", C.dim]);
   if (S.high > 0) boosts.push([`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, `HIGH ${S.high.toFixed(1)}s`, C.lime]);
   if (S.tweak > 0) boosts.push([`8-BALL · triple shots · ${S.tweak.toFixed(1)}s`, `8-BALL ${S.tweak.toFixed(1)}s`, C.cyan]);
+  if (S.hard > 0) boosts.push([`BONER PILLS · three on the house · ${S.hard.toFixed(1)}s`, `PILLS ${S.hard.toFixed(1)}s`, C.blue]);
   if (boosts.length) {
     g.fillStyle = boosts.length === 1 ? boosts[0][2] : C.ink;
     g.fillText(boosts.length === 1 ? boosts[0][0] : boosts.map((b) => b[1]).join(" · "), W / 2, y); y += 16;
@@ -2848,6 +2908,7 @@ function render() {
     else { ctx.fillStyle = S.turbo > 0 ? C.pink : S.std.clap ? C.lime : C.cyan; ctx.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   }
   if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t, S.escort.free);
+  for (const G of S.girls) drawEscort(ctx, G.x, G.y, S.t, false);
   const P = S.player;
   if (S.mode === "play" && !S.realm && !(P.inv > 0 && Math.floor(S.t * 12) % 2)) {
     for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(ctx, P.x + gx, P.y, S.t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
@@ -2981,7 +3042,8 @@ function buildSheet(c) {
   const sections = [
     ["Down the hatch", [
       ["Beers", st.beers],
-      ["Highest BAC", st.beers ? "." + String(st.peakBac).padStart(2, "0") + (st.peakBac >= 8 ? " · over the limit" : "") : "Sober"],
+      ["Whiskeys", st.whiskeys],
+      ["Highest BAC", st.beers || st.whiskeys ? "." + String(st.peakBac).padStart(2, "0") + (st.peakBac >= 8 ? " · over the limit" : "") : "Sober"],
       ["Blackouts", st.texts / 50],
       ["Texts to your ex", st.texts],
       ["Coke snorted", `${st.bags} g`],
@@ -2990,6 +3052,7 @@ function buildSheet(c) {
     ]],
     ["Company", [
       ["Escorts hired", `${st.escorts} · ${money(st.escortCents)}`],
+      ["Boner pills", st.pills ? `${st.pills} · ${st.pills * 3} escorts on the house` : 0],
       ["Rubbers used", st.rubbersUsed],
       ["STDs caught", tally(st.stdHits) || "None. Somehow."],
       ["Clinic visits", st.clinics],
