@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v20</span>
+  <span id="ver">v21</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -349,19 +349,26 @@ function tone(f, d, type = "square", v = 0.04, f2 = 0, delay = 0) {
   const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t0);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
+  // A gain node sits at full volume until its first scheduled value, and a sound can start a hair before that moment.
+  // Starting every gain at zero keeps that one stray sample from getting out as a click.
+  g.gain.value = 0;
   g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
   o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + d + 0.02);
 }
-function hiss(d, v = 0.08, freq = 1200) {
-  if (!actx || muted) return;
+function noise() {
   if (!noiseBuf) {
     noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
     const ch = noiseBuf.getChannelData(0);
     for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
   }
+  return noiseBuf;
+}
+function hiss(d, v = 0.08, freq = 1200) {
+  if (!actx || muted) return;
   const t0 = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-  src.buffer = noiseBuf; f.type = "bandpass";
+  src.buffer = noise(); f.type = "bandpass";
   f.frequency.setValueAtTime(freq, t0); f.frequency.exponentialRampToValueAtTime(freq * 2.5, t0 + d);
+  g.gain.value = 0;
   g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
   src.connect(f); f.connect(g); g.connect(actx.destination); src.start(t0); src.stop(t0 + d + 0.02);
 }
@@ -963,6 +970,76 @@ function drawIcons() {
       g.scale(1.15, 1.15); drawDrop(g, k, 0, 0, 0);
     }
   });
+}
+
+// ---------- music: an 8-bit loop of the game's own, about half as loud as the guns (as ordered by Jeremy) ----------
+// Three voices, written a quarter of a second ahead on the audio clock: a square-wave arpeggio with a tune over it,
+// a triangle bass, and ticks of noise for drums. Eight bars in A minor for the waves. A boss gets the same thing a
+// minor third up with a busier bass. The realm gets a slow whole-tone drift with no drums at all.
+// It speeds up on nose candy, drags in a crash or a hangover, and goes muffled during a blackout.
+const SONG = {
+  step: 0.114,
+  chords: [[57, 60, 64, 69], [57, 60, 64, 69], [53, 57, 60, 65], [53, 57, 60, 65], [55, 60, 64, 67], [55, 60, 64, 67], [55, 59, 62, 67], [56, 59, 64, 68]],
+  roots: [45, 45, 41, 41, 48, 48, 43, 40],
+  arp: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 3, 2, 1],
+  bass: [0, 3, 6, 8, 11, 14],
+  // The tune over bars five to eight; 0 is a rest.
+  tune: [
+    [76, 0, 0, 79, 0, 0, 76, 0, 72, 0, 0, 0, 74, 0, 76, 0],
+    [79, 0, 0, 0, 0, 0, 76, 0, 0, 0, 74, 0, 72, 0, 0, 0],
+    [74, 0, 0, 71, 0, 0, 74, 0, 79, 0, 0, 0, 78, 0, 74, 0],
+    [76, 0, 0, 80, 0, 0, 83, 0, 0, 0, 80, 0, 76, 0, 0, 0],
+  ],
+  drift: [60, 62, 64, 66, 68, 70],
+};
+// The guns are a square wave at 0.018. Measured with every voice playing, these levels put the music at a little under
+// half the strength of a gunshot (0.002 against 0.0047, as an average over the sound), with no peak above the gun's own.
+const LOUD = { arp: 0.0055, under: 0.0035, tune: 0.0065, bass: 0.01, hat: 0.003, snare: 0.005, drift: 0.006, drone: 0.009 };
+const music = { next: 0, step: 0, mode: "", vol: 1, bus: null };
+const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+function musicBus() {
+  if (!music.bus) { music.bus = actx.createGain(); music.bus.gain.value = 1; music.bus.connect(actx.destination); }
+  return music.bus;
+}
+function note(f, t0, d, type, v) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t0);
+  g.gain.value = 0;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  o.connect(g); g.connect(musicBus()); o.start(t0); o.stop(t0 + d + 0.02);
+}
+function drum(t0, d, v, freq) {
+  const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = noise(); f.type = "highpass"; f.frequency.setValueAtTime(freq, t0);
+  g.gain.value = 0;
+  g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  src.connect(f); f.connect(g); g.connect(musicBus()); src.start(t0); src.stop(t0 + d + 0.02);
+}
+function playStep(mode, i, t) {
+  if (mode === "realm") {
+    const s = i % 32;
+    note(hz(SONG.drift[(s * 2 + Math.floor(s / 8)) % 6] + (s % 16 < 8 ? 12 : 24)), t, 0.34, "triangle", LOUD.drift);
+    if (s % 8 === 0) note(hz(36 + (Math.floor(i / 32) % 2 ? 2 : 0)), t, 1.4, "sine", LOUD.drone);
+    return;
+  }
+  const boss = mode === "boss", up = boss ? 3 : 0, bar = Math.floor(i / 16) % 8, s = i % 16;
+  const lead = bar >= 4 ? SONG.tune[bar - 4][s] : 0;
+  note(hz(SONG.chords[bar][SONG.arp[s]] + 12 + up), t, 0.09, "square", bar >= 4 ? LOUD.under : LOUD.arp);
+  if (lead) note(hz(lead + up), t, 0.22, "square", LOUD.tune);
+  if (boss ? s % 2 === 0 : SONG.bass.includes(s)) note(hz(SONG.roots[bar] + up + (s === 8 || s === 14 ? 12 : 0)), t, 0.16, "triangle", LOUD.bass);
+  if (s % 4 === 2 || (boss && s % 2 === 0)) drum(t, 0.03, LOUD.hat, 6000);
+  if (s === 4 || s === 12) drum(t, 0.09, LOUD.snare, 1800);
+}
+function musicTick() {
+  if (!actx || muted || paused || actx.state !== "running" || !S || (S.mode !== "play" && S.mode !== "dying")) { music.next = 0; return; }
+  const now = actx.currentTime, mode = S.realm ? "realm" : S.boss ? "boss" : "wave";
+  // Picking up after a pause, a mute or a new game: start a beat from now rather than racing to catch up.
+  if (!music.next || music.next < now - 0.2) music.next = now + 0.06;
+  if (mode !== music.mode) { music.mode = mode; music.step = 0; }
+  const vol = S.blackout > 0 ? 0.25 : 1;
+  if (vol !== music.vol) { music.vol = vol; musicBus().gain.setTargetAtTime(vol, now, 0.12); }
+  const pace = (mode === "realm" ? 1.5 : mode === "boss" ? 0.92 : 1) * (S.turbo > 0 ? 0.78 : S.crash > 0 || S.hangover > 0 ? 1.3 : S.high > 0 ? 1.15 : 1);
+  while (music.next < now + 0.25) { playStep(mode, music.step++, music.next); music.next += SONG.step * pace; }
 }
 
 // ---------- stars ----------
@@ -2833,7 +2910,12 @@ fireBtn.addEventListener("lostpointercapture", letGo);
 syncFire();
 const muteBtn = $("mute");
 function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
-muteBtn.addEventListener("click", () => { muted = !muted; store.set("sd-muted", muted); syncMute(); ensureAudio(); muteBtn.blur(); });
+muteBtn.addEventListener("click", () => {
+  muted = !muted; store.set("sd-muted", muted); syncMute(); ensureAudio();
+  // Notes already written a quarter of a second ahead are cut off at once, and come back at the right level.
+  if (music.bus) { music.bus.gain.cancelScheduledValues(actx.currentTime); music.bus.gain.setValueAtTime(muted ? 0 : music.vol, actx.currentTime); }
+  muteBtn.blur();
+});
 syncMute();
 
 // ---------- loop ----------
@@ -2848,6 +2930,7 @@ function frame(now) {
   last = now;
   if (!paused) update(dt);
   render();
+  musicTick();
   requestAnimationFrame(frame);
 }
 const relayout = () => { fit(); drawIcons(); };
