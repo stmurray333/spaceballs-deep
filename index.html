@@ -303,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v29</span>
+  <span id="ver">v30</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1589,23 +1589,46 @@ function hurt(title, sub) {
 }
 
 // ---------- the mugging: a prank, by order of Stephen, who says it is coming out again later ----------
-// The first time a game's cash reaches $1,000 the lights go out, Gangster Scuba Steve swims up, smacks the ship,
-// takes every cent, laughs about it and swims off. Nothing else is lost, and the game carries on from where it stopped:
-// an escort on the clock stays for nothing, since with empty pockets she would walk out before the banner had been read.
+// The first time a game's cash reaches $1,000 the lights flicker out. Something pings in the dark and a pair of lit
+// goggles comes up from the deep. A spotlight finds Gangster Scuba Steve, who hauls the ship in, winds up, smacks it,
+// turns it over, shakes every cent out of it, laughs about it and swims off. About thirteen seconds, start to finish.
+// Nothing else is lost, and the game carries on from where it stopped: an escort on the clock stays for nothing,
+// since with empty pockets she would walk out before the banner had been read.
 // It happens once a game. To switch the whole thing off, set PRANK to false.
 const PRANK = true;
-const MUG = { at: 100000, smack: 1.7, take: 2.1, laugh: 3.4, leave: 4.8, len: 5.5 };
+// When each thing happens, in seconds from the lights going. "drain" is how long the shaking-out takes.
+const MUG = { at: 100000, dark: 1, eyes: 1.5, light: 4, name: 4.35, grab: 5.5, smack: 7.3, take: 8.3, drain: 2.2, laugh: 10.7, leave: 12.5, len: 13.5 };
+const MUG_PINGS = [1.3, 2.2, 2.9, 3.4, 3.7, 3.9], MUG_HAS = 12;
+// Everything with a moment of its own: the sounds, the slap, the take. Each goes out as its moment comes and never
+// ahead of time, so switching the sound off or leaving the page stops the scene's sound at once.
+const MUG_CUES = [
+  [0, () => tone(330, 0.9, "sawtooth", 0.05, 40)],
+  [0.2, () => hiss(0.05, 0.05, 2400)], [0.6, () => hiss(0.05, 0.05, 2400)],
+  ...MUG_PINGS.map((at) => [at, () => tone(1320, 0.5, "sine", 0.035, 1180)]),
+  // A pulse in the dark that keeps getting faster, with one long rising note under it.
+  ...[1.6, 2.15, 2.6, 2.95, 3.25, 3.5, 3.7, 3.85].map((at) => [at, () => tone(98, 0.16, "sawtooth", 0.05, 62)]),
+  [2.4, () => tone(110, 1.55, "triangle", 0.03, 330)],
+  [MUG.light, () => { hiss(0.09, 0.1, 500); tone(180, 0.14, "square", 0.05, 90); }],
+  [MUG.name, () => tone(131, 0.35, "sawtooth", 0.07, 52)],
+  [MUG.name + 0.5, () => { tone(98, 0.6, "sawtooth", 0.08, 41); tone(196, 0.6, "square", 0.03, 185); }],
+  ...[0, 1, 2, 3, 4].map((i) => [MUG.grab + 0.05 + i * 0.16, () => tone(i % 2 ? 250 : 210, 0.06, "square", 0.022)]),
+  [MUG.smack - 0.75, () => tone(190, 0.6, "sine", 0.035, 760)],
+  [MUG.smack, () => { S.shake = 0.7; sfx.hurt(); hiss(0.22, 0.12, 900); }],
+  ...[0.3, 0.5, 0.7].map((d) => [MUG.smack + d, () => tone(1500, 0.07, "sine", 0.02, 1900)]),
+  [MUG.take, (M) => { M.took = Math.max(0, S.cents); S.cents -= M.took; S.stats.robbedCents += M.took; }],
+  ...Array.from({ length: 20 }, (_, i) => [MUG.take + 0.3 + i * 0.095, () => tone(1500 - i * 48, 0.05, "square", 0.024)]),
+  [MUG.take + MUG.drain, () => sfx.broke()],
+  ...Array.from({ length: MUG_HAS }, (_, i) => [MUG.laugh + i * 0.15, () => sfx.laugh(i)]),
+  [MUG.leave, () => tone(260, 0.6, "sine", 0.03, 880)],
+  [MUG.len - 0.45, () => tone(90, 0.3, "square", 0.03, 200)],
+].sort((a, b) => a[0] - b[0]);
 function mugTick(dt) {
-  const M = S.mug, was = M.t;
+  const M = S.mug;
   M.t += dt;
   S.shake = Math.max(0, S.shake - dt);
-  const now = (k) => was < MUG[k] && M.t >= MUG[k];
-  if (now("smack")) { S.shake = 0.6; sfx.hurt(); }
-  if (now("take")) { M.took = Math.max(0, S.cents); S.cents -= M.took; S.stats.robbedCents += M.took; sfx.broke(); }
-  // He laughs a "ha" at a time, so switching the sound off or leaving the page stops him at once.
-  while (M.ha < 8 && M.t >= MUG.laugh + M.ha * 0.16) sfx.laugh(M.ha++);
+  while (M.cue < MUG_CUES.length && M.t >= MUG_CUES[M.cue][0]) MUG_CUES[M.cue++][1](M);
   if (M.t >= MUG.len) {
-    S.mug = null; S.player.inv = Math.max(S.player.inv, 2);
+    S.mug = null; S.player.inv = Math.max(S.player.inv, 3);
     const E = S.escort;
     if (E && !E.free) { E.comp = true; pop("On the house, sugar.", E.x, E.y - 24, C.pink, 15); }
     banner("Robbed", `Gangster Scuba Steve took all ${money(M.took)} of it. Carry on.`, C.red);
@@ -1991,7 +2014,7 @@ function update(dt) {
   if (S.mug) { mugTick(dt); return; }
   if (PRANK && !S.stats.robbed && S.mode === "play" && S.cents >= MUG.at && !S.realm && S.blackout <= 0) {
     // Nothing else moves on the frame he arrives, and a Waffle House flash still on screen is put away.
-    S.stats.robbed = 1; S.mug = { t: 0, took: 0, ha: 0 }; S.bullets = []; S.wipe = 0;
+    S.stats.robbed = 1; S.mug = { t: 0, took: 0, cue: 0 }; S.bullets = []; S.wipe = 0;
     return;
   }
   S.wipe = Math.max(0, S.wipe - dt);
@@ -2640,50 +2663,105 @@ function drawSteve(g, x, y, t, slap, laugh, loot) {
 // The whole scene, drawn over everything while the world is stopped.
 function drawMug(g) {
   const M = S.mug, t = M.t, P = S.player;
-  const dark = Math.min(clamp(t / 0.45, 0, 1), clamp((MUG.len - t) / 0.45, 0, 1));
+  const tw = (from, len) => clamp((t - from) / len, 0, 1);      // how far through a stretch of the scene, 0 to 1
+  // The lights flicker out (they just fade for anyone who asked for less motion) and come back up at the end.
+  const flick = reduced ? tw(0, MUG.dark) : t >= MUG.dark ? 1 : [0.5, 0.15, 0.75, 0.35, 1][Math.floor(t / MUG.dark * 5)];
+  const dark = Math.min(flick, clamp((MUG.len - t) / 0.5, 0, 1));
+  const lit = tw(MUG.light, 0.12), off = ease(tw(MUG.leave, 0.8));
   g.save();
   g.globalAlpha = dark; g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
-  // He comes up from the deep, hangs there while he works, and leaves over the top.
-  const up = ease(clamp((t - 0.4) / 0.9, 0, 1)), off = ease(clamp((t - MUG.leave) / 0.6, 0, 1));
-  const sx = 214, sy = 760 - up * 470 - off * 520 + (reduced ? 0 : Math.sin(t * 2.4) * 5);
-  const slap = clamp((t - (MUG.smack - 0.55)) / 0.6, 0, 1) * (t < MUG.take ? 1 : clamp(1 - (t - MUG.take) / 0.3, 0, 1));
-  const laugh = clamp((t - MUG.laugh) / 0.25, 0, 1) * clamp((MUG.leave - t) / 0.25, 0, 1);
-  const loot = clamp((t - MUG.take) / 1, 0, 1);
-  // Your ship is hauled in front of him, takes the slap, and is put back when he goes.
-  const held = ease(clamp((t - 0.5) / 0.8, 0, 1)) * (1 - off), hit = clamp((t - MUG.smack) / 0.5, 0, 1);
-  const jolt = t >= MUG.smack ? Math.sin(hit * Math.PI) : 0;
-  const px = P.x + (104 - P.x) * held - jolt * 34, py = P.y + (318 - P.y) * held - jolt * 10;
+  // He comes up from the deep in the dark, hangs there while he works, and leaves over the top.
+  const rise = (at) => 760 - ease(clamp((at - MUG.eyes) / (MUG.light - MUG.eyes - 0.2), 0, 1)) * 470;
+  const sx = 214, sy = rise(t) - off * 540 + (reduced ? 0 : Math.sin(t * 2.4) * 5);
+  // The spotlight that finds him: a beam from above and a pool of light where he hangs.
+  if (lit > 0 && off < 1) {
+    const beam = g.createLinearGradient(0, 0, 0, 400);
+    beam.addColorStop(0, "rgba(190, 240, 255, 0.22)"); beam.addColorStop(1, "rgba(190, 240, 255, 0.03)");
+    g.globalAlpha = dark * lit * (1 - off); g.fillStyle = beam;
+    g.beginPath(); g.moveTo(sx - 24, -12); g.lineTo(sx + 24, -12); g.lineTo(sx + 118, 394); g.lineTo(sx - 118, 394); g.closePath(); g.fill();
+    g.fillStyle = "rgba(190, 240, 255, 0.1)"; g.beginPath(); g.ellipse(sx, 394, 118, 20, 0, 0, TAU); g.fill();
+  }
+  // The slap is a slow wind-up and a fast swing, and the arm stays out to hold the ship until he goes.
+  const slap = (ease(tw(MUG.smack - 0.9, 0.78)) + tw(MUG.smack - 0.12, 0.12)) / 2 * (1 - tw(MUG.leave, 0.3));
+  const laugh = tw(MUG.laugh, 0.25) * (1 - tw(MUG.leave - 0.25, 0.25));
   g.globalAlpha = dark;
-  g.save(); g.translate(px, py); g.rotate(t >= MUG.smack && !reduced ? -(1 - hit) * 7 : 0);
+  drawSteve(g, sx, sy, t, slap, laugh, tw(MUG.take, MUG.drain));
+  if (lit < 1) {
+    // Until the spotlight finds him he is a shape in the dark with two lit lenses.
+    g.globalAlpha = dark * 0.94 * (1 - lit); g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
+    g.globalAlpha = dark * (1 - lit) * tw(MUG.eyes, 0.5); g.fillStyle = C.cyan; g.shadowColor = C.cyan; g.shadowBlur = 16;
+    g.fillRect(sx - 17, sy - 67, 15.5, 12); g.fillRect(sx + 1.5, sy - 67, 15.5, 12); g.shadowBlur = 0;
+  }
+  // Pings in the dark: each ring spreads from wherever he had got to.
+  g.strokeStyle = C.cyan; g.lineWidth = 2;
+  for (const at of MUG_PINGS) {
+    const k = (t - at) / 1.1;
+    if (k <= 0 || k >= 1) continue;
+    g.globalAlpha = dark * (1 - k) * 0.6; g.beginPath(); g.arc(sx, rise(at) - 20, 20 + k * 300, 0, TAU); g.stroke();
+  }
+  // A few bubbles drifting up through the dark.
+  g.lineWidth = 1.2;
+  for (let i = 0; i < 9; i++) {
+    const f = (t * (0.11 + i * 0.013) + i * 0.37) % 1;
+    g.globalAlpha = dark * 0.35 * Math.sin(f * Math.PI) * tw(MUG.dark, 0.6);
+    g.beginPath(); g.arc((i * 83 + 31) % W + Math.sin(t * 1.3 + i) * 6, H + 10 - f * (H + 20), 2 + (i % 3) * 1.5, 0, TAU); g.stroke();
+  }
+  // Your ship sits alone in the dark, is hauled in front of him, takes the slap and spins, is turned over and shaken
+  // out, and is let go when he leaves.
+  const held = ease(tw(MUG.grab, 0.9)) * (1 - off), hit = tw(MUG.smack, 0.9), tip = ease(tw(MUG.take, 0.3)) * (1 - off);
+  const jolt = t >= MUG.smack ? Math.sin(Math.min(1, hit * 1.8) * Math.PI) : 0;
+  const shaken = !reduced && t >= MUG.take + 0.3 && t < MUG.take + MUG.drain ? Math.sin(t * 40) * 4 : 0;
+  const px = P.x + (104 + 22 * tip - P.x) * held - jolt * 40 + shaken, py = P.y + (318 - 16 * tip - P.y) * held - jolt * 12;
+  g.globalAlpha = dark;
+  g.save(); g.translate(px, py); g.rotate(reduced ? 0 : (t >= MUG.smack ? -(1 - ease(hit)) * TAU * 2 : 0) + tip * Math.PI);
   for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, gx, 0, t, false, false);
   g.restore();
-  drawSteve(g, sx, sy, t, slap, laugh, loot);
-  // The money goes across to him a coin at a time.
-  g.fillStyle = C.gold;
-  for (let i = 0; i < 12; i++) {
-    const k = clamp((t - MUG.take - i * 0.07) / 0.5, 0, 1);
-    if (k <= 0 || k >= 1) continue;
-    g.beginPath(); g.arc(px + (sx + 50 - px) * k, py + (sy + 18 - py) * k - Math.sin(k * Math.PI) * 46, 4, 0, TAU); g.fill();
+  // It sees stars for a moment.
+  const dizzy = Math.min(tw(MUG.smack + 0.2, 0.15), 1 - tw(MUG.take, 0.2));
+  if (dizzy > 0) {
+    g.globalAlpha = dark * dizzy;
+    for (let i = 0; i < 3; i++) { const q = (reduced ? 0 : t * 7) + i * TAU / 3; drawStar(g, px + Math.cos(q) * 17, py - 27 + Math.sin(q) * 5, 5, 5, 2.2, C.gold); }
   }
-  // What it says while it happens.
+  // The money comes out of the ship and across into his sack, a coin at a time.
+  g.fillStyle = C.gold; g.globalAlpha = dark;
+  for (let i = 0; i < 26; i++) {
+    const k = (t - MUG.take - 0.3 - i * (MUG.drain - 0.8) / 26) / 0.5;
+    if (k <= 0 || k >= 1) continue;
+    g.beginPath(); g.arc(px + (sx + 50 - px) * k, py + 12 + (sy + 6 - py) * k - Math.sin(k * Math.PI) * 40, 4, 0, TAU); g.fill();
+  }
+  // What it says while it happens. The big words slam in; the talk is typed out a letter at a time.
   g.textAlign = "center"; g.textBaseline = "middle";
-  const said = (text, x, y, size, color, from, to) => {
-    const a = Math.min(clamp((t - from) / 0.15, 0, 1), clamp((to - t) / 0.15, 0, 1));
+  const slam = (text, x, y, size, color, from, to, big = 0) => {
+    const a = Math.min(tw(from, 0.08), clamp((to - t) / 0.15, 0, 1));
     if (a <= 0) return;
+    const z = reduced ? 1 : 1 + big * (1 - ease(tw(from, 0.18)));
+    g.save(); g.translate(x, y); g.scale(z, z);
     g.globalAlpha = a * dark; g.font = `${size}px ${FONT_SIGN}`; g.fillStyle = color; g.shadowColor = color; g.shadowBlur = 14;
-    g.fillText(text, x, y); g.shadowBlur = 0;
+    g.fillText(text, 0, 0); g.restore();
   };
-  said("GANGSTER", W / 2, 96, 24, C.pink, 0.9, MUG.leave);
-  said("SCUBA STEVE", W / 2, 128, 32, C.cyan, 0.9, MUG.leave);
-  said("SMACK!", 96, 250 - (reduced ? 0 : hit * 14), 34, C.red, MUG.smack, MUG.take + 0.2);
-  said("RUN THEM POCKETS", W / 2, 470, 22, C.gold, MUG.take, MUG.laugh);
-  said("HA HA HA HA", W / 2, 470 + (reduced ? 0 : Math.sin(t * 20) * 4), 30, C.gold, MUG.laugh, MUG.leave);
-  said("APPRECIATE YOU", W / 2, 470, 22, C.cyan, MUG.leave, MUG.len);
-  // Your cash, counting down to nothing.
-  const left = t < MUG.take ? S.cents : Math.round(M.took * (1 - clamp((t - MUG.take) / 1, 0, 1)));
-  g.globalAlpha = dark * clamp((t - 0.9) / 0.2, 0, 1);
-  g.font = `13px ${FONT_SIGN}`; g.fillStyle = C.dim; g.fillText("YOUR CASH", W / 2, 520);
-  g.font = `44px ${FONT_HUD}`; g.fillStyle = left > 0 ? C.gold : C.red; g.fillText(money(left), W / 2, 552);
+  const typed = (text, y, color, from, to) => {
+    const a = clamp((to - t) / 0.15, 0, 1);
+    if (t < from || a <= 0) return;
+    g.globalAlpha = a * dark; g.font = `26px ${FONT_HUD}`; g.fillStyle = color;
+    const x = W / 2 - g.measureText(text).width / 2;
+    g.textAlign = "left"; g.fillText(text.slice(0, Math.ceil((t - from) / 0.04)), x, y); g.textAlign = "center";
+  };
+  typed("THAT'S A LOT OF MONEY.", 196, C.ink, MUG.dark + 0.1, 2.5);
+  typed("SOMEBODY NOTICED.", 196, C.red, 2.65, MUG.light - 0.05);
+  slam("GANGSTER", W / 2, 96, 24, C.pink, MUG.name, MUG.leave + 0.3, 1.4);
+  slam("SCUBA STEVE", W / 2, 128, 32, C.cyan, MUG.name + 0.5, MUG.leave + 0.3, 1.4);
+  typed("NICE STACK YOU GOT THERE.", 470, C.ink, MUG.grab + 0.05, MUG.smack - 0.1);
+  slam("SMACK!", 112, 250, 38, C.red, MUG.smack, MUG.take + 0.1, 0.6);
+  slam("RUN THEM POCKETS", W / 2, 470, 22, C.gold, MUG.take, MUG.laugh - 0.05, 0.6);
+  slam("HA HA HA HA", W / 2, 470 + (reduced ? 0 : Math.sin(t * 20) * 4), 30, C.gold, MUG.laugh, MUG.leave);
+  slam("APPRECIATE YOU", W / 2, 470, 22, C.cyan, MUG.leave, MUG.len);
+  // Your cash, the one thing lit in the dark, counting down to nothing as he shakes it out.
+  const left = t < MUG.take ? S.cents : Math.round(M.took * (1 - tw(MUG.take + 0.3, MUG.drain - 0.3)));
+  g.globalAlpha = dark * tw(MUG.dark, 0.3);
+  g.font = `13px ${FONT_SIGN}`; g.fillStyle = C.dim; g.fillText("YOUR CASH", W / 2, 597);
+  g.font = `36px ${FONT_HUD}`; g.fillStyle = left > 0 ? C.gold : C.red; g.fillText(money(left), W / 2, 620);
+  // One white flash as the slap lands.
+  if (!reduced && t >= MUG.smack && t < MUG.smack + 0.2) { g.globalAlpha = 0.4 * (1 - tw(MUG.smack, 0.2)); g.fillStyle = C.ink; g.fillRect(-12, -12, W + 24, H + 24); }
   g.restore();
 }
 // The key bump card: a key with a little pile on the end of it, as specified.
@@ -2994,6 +3072,8 @@ function start() {
   // Shortcuts for testing the bosses: open the page with #boss1 to #boss5 on the end of the link (#bertha still works).
   const skip = /^#boss([1-5])$/.exec(location.hash);
   if (skip || location.hash === "#bertha") { S.wave = 2; S.dmtWave = 2; S.bugs = []; if (skip) S.bossCount = skip[1] - 1; }
+  // And one for watching the mugging without earning it: #steve starts the game with $1,000 in hand.
+  if (location.hash === "#steve") { const gift = MUG.at - S.cents; S.cents += gift; S.stats.earned += gift; }
   if (introSeen) banner("Wave 1", restHint(), C.cyan);
   else if (reduced) { introSeen = true; banner("Wave 1", `U.S.S. Mike Honcho, reporting for duty. ${restHint()}`, C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
