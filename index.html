@@ -24,6 +24,11 @@
   --navy: #2547a8;
   --skin: #f3b58f;
   --brown: #8a5a3c;
+  --violet: #a98bff;
+  --mint: #8ff0c8;
+  --orange: #ff9a3d;
+  --blue: #4d7cff;
+  --plum: #3a1a5c;
   --scrim: rgba(12, 7, 22, 0.88);
   --pink-glow: rgba(255, 61, 158, 0.28);
   --gold-glow: rgba(255, 200, 71, 0.3);
@@ -204,6 +209,13 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 #mute { right: calc(var(--u) * 8); }
 #fire { left: calc(var(--u) * 8); color: var(--ink); }
 #fire[aria-pressed="false"] { color: var(--red); border-color: var(--red); }
+/* With tilt steering it is a hold-to-fire button: bigger, and it lights up while the guns are running. */
+#fire.hold {
+  padding: calc(var(--u) * 9) calc(var(--u) * 12); font-size: calc(var(--u) * 17);
+  color: var(--ink); border-color: var(--dim);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+#fire.hold[aria-pressed="true"] { color: var(--lime); border-color: var(--lime); }
 @media (prefers-reduced-motion: reduce) { .neon .flick { animation: none; } }
 </style>
 </head>
@@ -220,9 +232,9 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
       <div class="item"><canvas data-icon="candy" aria-hidden="true"></canvas><div><b>Nose candy</b><span>Turbo, then a crash</span></div></div>
       <div class="item"><canvas data-icon="choker" aria-hidden="true"></canvas><div><b>Choker</b><span>Steals your ship</span></div></div>
       <div class="item"><canvas data-icon="card" aria-hidden="true"></canvas><div><b>Escort</b><span>Wingwoman. $1/sec</span></div></div>
-      <div class="item"><canvas data-icon="rooster" aria-hidden="true"></canvas><div><b>Huge cock</b><span>$10. It's a rooster</span></div></div>
+      <div class="item"><canvas data-icon="rooster" aria-hidden="true"></canvas><div><b>Cocks and tits</b><span>$10 and $3. Birds</span></div></div>
       <div class="item"><canvas data-icon="cody" aria-hidden="true"></canvas><div><b>Navy SEAL Cody</b><span>+1 life</span></div></div>
-      <div class="item"><canvas data-icon="tit" aria-hidden="true"></canvas><div><b>Great tits</b><span>$3. They're birds</span></div></div>
+      <div class="item"><canvas data-icon="waffle" aria-hidden="true"></canvas><div><b>Waffle House</b><span>Rare. Clears screen</span></div></div>
       <div class="item"><canvas data-icon="bertha" aria-hidden="true"></canvas><div><b>Bosses</b><span>One every 3 waves</span></div></div>
       <div class="item"><canvas data-icon="beer" aria-hidden="true"></canvas><div><b>Booze</b><span>More pay and power</span></div></div>
       <div class="item"><canvas data-icon="cop" aria-hidden="true"></canvas><div><b>DUI checkpoint</b><span>Dodge the light</span></div></div>
@@ -277,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v19</span>
+  <span id="ver">v20</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -298,6 +310,7 @@ const C = {
   void: tok("--void"), deep: tok("--deep"), ink: tok("--ink"), dim: tok("--dim"), pink: tok("--pink"),
   gold: tok("--gold"), cyan: tok("--cyan"), lime: tok("--lime"), red: tok("--red"), navy: tok("--navy"),
   skin: tok("--skin"), brown: tok("--brown"),
+  violet: tok("--violet"), mint: tok("--mint"), orange: tok("--orange"), blue: tok("--blue"), plum: tok("--plum"),
 };
 const FONT_HUD = '"VT323", ui-monospace, Menlo, monospace';
 const FONT_SIGN = '"Bungee", Impact, "Arial Black", sans-serif';
@@ -992,11 +1005,12 @@ const SHOT_HALF = { kiss: 11, slap: 11, pan: 10, donut: 9, papers: 9, ticket: 8,
 // The ship has the bottom quarter of the screen to move around in.
 const Y_MAX = H - 74, Y_MIN = H - 224;
 const input = {
-  left: false, right: false, up: false, down: false, keyFire: false, touchFire: false,
+  left: false, right: false, up: false, down: false, keyFire: false, touchFire: false, holdFire: false,
   dragging: false, lastFx: 0, lastFy: 0, target: W / 2, targetY: Y_MAX,
 };
 // The Fire button in the corner (or the F key): off means the ship flies without shooting, so the guns can cool.
-// Every game starts with it on.
+// Every game starts with it on. With tilt steering the same button is held down to shoot instead (as ordered by Jeremy),
+// and fireOn becomes a lock: a quick tap locks the guns on, for playing without touching the screen, and another tap unlocks them.
 let fireOn = true;
 let S = null;
 
@@ -1330,10 +1344,9 @@ function hitBug(b, dmg = 1, quiet = false) {
   else if (r < 0.32 && sick() && !S.drops.some((d) => d.kind === "clinic")) kind = "clinic";
   else if (r < 0.36) kind = "dime";
   else if (r < 0.375) kind = "eighth";
-  // Waffle House employee training, as ordered by Jeremy: at most one a wave. Wave 1 always has one so everybody gets a shift.
-  if (S.waffleWave !== S.wave && (Math.random() < 0.012 || (S.wave === 1 && S.bugs.filter((o) => !o.dead).length <= 20))) {
-    kind = "waffle"; S.waffleWave = S.wave;
-  }
+  // Waffle House employee training, as ordered by Jeremy: rare, and only when it has got wild out there.
+  // Wild means the enemy shots in the air plus twice the bugs in a dive or a beam come to WILD or more. At most one a wave.
+  if (S.waffleWave !== S.wave && wildness() >= WILD && Math.random() < 0.06) { kind = "waffle"; S.waffleWave = S.wave; }
   if (kind) S.drops.push({ kind, x: b.x, y: b.y, vy: 85 });
 }
 function collect(kind) {
@@ -1391,6 +1404,8 @@ function hurt(title, sub) {
 }
 
 // ---------- Waffle House employee training, as ordered by Jeremy: like the lightning in 1942, it clears the screen ----------
+const WILD = 7;
+const wildness = () => S.ebullets.length + 2 * S.bugs.filter((o) => !o.dead && (o.state === "dive" || o.state === "beam" || o.state === "beamIn")).length;
 // Every bug and flyer on screen goes down and pays, every enemy shot is wiped, and a boss takes fifteen. The cops are still bulletproof.
 function waffleHouse() {
   S.stats.waffles++; S.wipe = 0.9; S.shake = 0.5;
@@ -1407,10 +1422,11 @@ function waffleHouse() {
   sfx.boom();
 }
 
-// ---------- the DMT realm, as ordered by Jeremy: a challenge stage like the ones in Galaga, before every boss ----------
-// When the second wave of each three is cleared, a black hole opens and takes the ship somewhere else for a while.
+// ---------- the DMT realm, as ordered by Jeremy: a challenge stage like the ones in Galaga, one in every four waves ----------
+// When wave 2, 6, 10 and so on is cleared, a black hole opens and takes the ship somewhere else for a while.
+// Each trip is a little different: the colours turn and the squads come in another order.
 // The world outside stands still. Nothing in the realm can hurt you. Eight squads of ten machine elves come through
-// and every one you hit pays; get all eighty for a bonus. Then you are put back, and the boss turns up as usual.
+// and every one you hit pays; get all eighty for a bonus. Then you are put back, and the next wave or boss turns up as usual.
 // A squad's ten come 0.16s apart, which keeps the whole squad inside the 1.6s before the next one starts.
 const REALM = { in: 1.3, out: 1, squads: 8, per: 10, every: 1.6, gap: 0.16, cross: 3.2, pay: 200, perfect: 10000 };
 // Where an elf is, a fraction u of the way along its squad's path. Most of the paths start and end at the door in the middle.
@@ -1427,7 +1443,7 @@ function elfAt(path, u) {
 }
 function enterRealm() {
   const P = S.player;
-  S.realm = { phase: "in", t: 0, x: P.x, y: P.y, elves: [], sent: 0, killed: 0, cents: 0 };
+  S.realm = { phase: "in", t: 0, x: P.x, y: P.y, elves: [], sent: 0, killed: 0, cents: 0, turn: S.stats.trips };
   // Nothing can touch you once the portal is open, including a shot landing in the same frame as the pickup.
   P.inv = Math.max(P.inv, 0.1);
   S.stats.trips++; S.bullets = [];
@@ -1454,7 +1470,9 @@ function updateRealm(dt) {
     // Each target is due at its own moment and starts as far along its path as it is late, so no two ever share a spot.
     const dueAt = (i) => 0.5 + Math.floor(i / REALM.per) * REALM.every + (i % REALM.per) * REALM.gap;
     while (R.sent < all && R.t >= dueAt(R.sent)) {
-      R.elves.push({ path: Math.floor(R.sent / REALM.per), age: R.t - dueAt(R.sent), hue: R.sent, x: -99, y: -99 }); R.sent++;
+      // The eight paths come in a different order on each trip.
+      const squad = Math.floor(R.sent / REALM.per), path = (squad * (R.turn % 2 ? 3 : 1) + R.turn) % 8;
+      R.elves.push({ path, age: R.t - dueAt(R.sent), hue: R.sent, x: -99, y: -99 }); R.sent++;
     }
     for (const e of R.elves) { e.age += dt; [e.x, e.y] = elfAt(e.path, e.age / REALM.cross); if (e.age >= REALM.cross) e.dead = true; }
     for (const s of S.bullets) { s.x += (s.vx || 0) * dt; s.y += s.vy * dt; }
@@ -1520,7 +1538,11 @@ function drink() {
     else banner("You're hammered", "Find some booger sugar, quick.", C.gold);
   }
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
-  if (S.drinks > 4) { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
+  // Not after a key bump, though: as ordered by Jeremy, once you have had one this wave you cannot black out till the next.
+  if (S.drinks > 4) {
+    if (S.bumpWave === S.wave) { S.drinks = 4; pop("Too wired to black out", P.x, P.y - 52, C.cyan, 15); }
+    else { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
+  }
 }
 function breathalyzer(f) {
   const P = S.player;
@@ -1645,7 +1667,7 @@ function updatePlayer(dt) {
   // Shots are free, but the guns heat up. Boil over and they lock until they have cooled most of the way down.
   // They cool slowly while firing and three times as fast while resting, which is what the Fire button is for.
   S.fireCd -= dt;
-  const wants = input.keyFire || ((input.touchFire || gyro.on) && fireOn);
+  const wants = input.keyFire || input.holdFire || ((input.touchFire || gyro.on) && fireOn);
   const firing = wants && !S.hot && S.flare <= 0 && S.jam <= 0;
   S.heat = Math.max(0, S.heat - (firing ? 0.1 : 0.3) * dt);
   if (S.hot && S.heat <= 0.4) { S.hot = false; pop("Guns are back", P.x, P.y - 34, C.cyan, 16); }
@@ -1874,8 +1896,8 @@ function update(dt) {
     else {
       S.nextWave -= dt;
       if (S.nextWave <= 0) {
-        // The challenge stage comes when the wave before a boss is cleared, once.
-        if (S.wave % 3 === 2 && S.dmtWave !== S.wave) { S.dmtWave = S.wave; enterRealm(); }
+        // The challenge stage comes once when wave 2, 6, 10 and so on is cleared: one in every four.
+        if (S.wave % 4 === 2 && S.dmtWave !== S.wave) { S.dmtWave = S.wave; enterRealm(); }
         else {
           S.wave++;
           if (S.wave % 3 === 0) spawnBoss();
@@ -1929,8 +1951,8 @@ function drawHUD(g) {
   // Gun heat: a bar that fills as you fire and drains as you rest. Full means locked until it is back under 40%.
   // The label reads HOLD while the Fire button is off.
   g.font = `16px ${FONT_HUD}`;
-  g.fillStyle = S.hot ? (reduced || Math.floor(S.t * 8) % 2 ? C.red : C.ink) : fireOn ? C.dim : C.cyan;
-  g.fillText(fireOn || S.hot ? "HEAT" : "HOLD", 12, 48);
+  g.fillStyle = S.hot ? (reduced || Math.floor(S.t * 8) % 2 ? C.red : C.ink) : fireOn || gyro.on ? C.dim : C.cyan;
+  g.fillText(fireOn || gyro.on || S.hot ? "HEAT" : "HOLD", 12, 48);
   const hx = 18 + g.measureText("HEAT").width;
   g.fillStyle = C.deep; g.fillRect(hx, 53, 60, 7);
   g.fillStyle = S.hot || S.heat > 0.75 ? C.red : C.gold; g.fillRect(hx, 53, 60 * S.heat, 7);
@@ -2097,6 +2119,125 @@ function drawMandala(g, x, y, r, t, alpha) {
   }
   g.restore(); g.globalAlpha = 1;
 }
+// ---------- the realm's backdrop, after the picture Jeremy sent ----------
+// A patterned sky, white sacred-geometry lines, rainbow beams, and in the middle of it a horned thing with too many eyes
+// holding a light in its chest (the light is the door the elves come out of). Everything mirrors left to right.
+// It is painted once per trip onto its own canvas, in colours that turn with each trip; what moves is drawn over it every frame.
+const ORB = [W / 2, 230];
+function paintBackdrop(g, turn) {
+  const hues = [C.violet, C.mint, C.pink, C.cyan, C.gold, C.orange, C.lime, C.blue];
+  const hue = (i) => hues[(Math.round(i) + turn * 3) % 8];
+  const [cx, oy] = ORB;
+  const poly = (x, y, r, n, rot) => {
+    g.beginPath();
+    for (let k = 0; k < n; k++) { const a = rot + (k / n) * TAU; if (k) g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); else g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+    g.closePath();
+  };
+  g.lineCap = "round"; g.lineJoin = "round";
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, C.plum); sky.addColorStop(0.6, C.deep); sky.addColorStop(1, C.void);
+  g.fillStyle = sky; g.fillRect(-12, -12, W + 24, H + 24);
+
+  // The sky: a tiling of six-pointed stars with a dot in each.
+  g.lineWidth = 1;
+  for (let row = 0; row < 17; row++) {
+    for (let col = 0; col < 9; col++) {
+      const x = col * 46 + (row % 2 ? 23 : 0) - 4, y = row * 40 + 4;
+      g.globalAlpha = 0.22; g.strokeStyle = hue(row + col);
+      poly(x, y, 15, 3, -Math.PI / 2); g.stroke(); poly(x, y, 15, 3, Math.PI / 2); g.stroke();
+      g.globalAlpha = 0.3; g.fillStyle = hue(row + col + 4); g.beginPath(); g.arc(x, y, 2.2, 0, TAU); g.fill();
+    }
+  }
+  // Rainbow beams crossing behind the light.
+  for (const lean of [-0.62, 0.62]) {
+    g.save(); g.translate(cx, oy); g.rotate(lean);
+    for (let i = 0; i < 6; i++) { g.globalAlpha = 0.2; g.fillStyle = hue(i + 2); g.fillRect(-420, (i - 3) * 7, 840, 7); }
+    g.restore();
+  }
+  // Sacred geometry in white: hexagrams, a flower of circles, and rays out to the edges.
+  g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = 0.3;
+  for (const r of [86, 150, 232]) { poly(cx, oy, r, 3, -Math.PI / 2); g.stroke(); poly(cx, oy, r, 3, Math.PI / 2); g.stroke(); }
+  g.globalAlpha = 0.2;
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU; g.beginPath(); g.arc(cx + Math.cos(a) * 52, oy + Math.sin(a) * 52, 52, 0, TAU); g.stroke(); }
+  g.beginPath(); g.arc(cx, oy, 104, 0, TAU); g.stroke();
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * TAU + Math.PI / 12;
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * 104, oy + Math.sin(a) * 104); g.lineTo(cx + Math.cos(a) * 420, oy + Math.sin(a) * 420); g.stroke();
+  }
+
+  // The thing itself, one half at a time.
+  for (const side of [-1, 1]) {
+    g.save(); g.translate(cx, 0); g.scale(side, 1);
+    // Feathers fanning out from the shoulder.
+    for (let i = 0; i < 8; i++) {
+      g.save(); g.translate(34, 238); g.rotate(-0.8 + i * 0.21);
+      g.globalAlpha = 0.5; g.fillStyle = hue(i); g.beginPath(); g.ellipse(72, 0, 60, 8.5, 0, 0, TAU); g.fill();
+      g.globalAlpha = 0.5; g.strokeStyle = C.ink; g.lineWidth = 0.8; g.beginPath(); g.moveTo(14, 0); g.lineTo(130, 0); g.stroke();
+      g.restore();
+    }
+    // The body: shoulders narrowing to a waist, in bands, and petals at the foot of it.
+    for (let k = 0; k < 5; k++) {
+      const w = 60 - k * 9;
+      g.globalAlpha = 0.6; g.fillStyle = k % 2 ? C.navy : hue(k + 5);
+      g.beginPath(); g.moveTo(0, 196 + k * 4); g.quadraticCurveTo(w, 214, w * 0.92, 272); g.quadraticCurveTo(w * 0.5, 350 - k * 6, 0, 374 - k * 8); g.closePath(); g.fill();
+    }
+    for (let i = 0; i < 4; i++) {
+      g.save(); g.translate(0, 398); g.rotate(0.18 + i * 0.38);
+      g.globalAlpha = 0.45; g.fillStyle = hue(i + 1); g.beginPath(); g.ellipse(0, -30, 10, 30, 0, 0, TAU); g.fill();
+      g.restore();
+    }
+    // A horn: banded and ridged, sweeping up and out and curling back down.
+    for (let j = 0; j < 26; j++) {
+      const a0 = Math.PI * 1.08 + (j / 26) * Math.PI * 1.2, a1 = a0 + (Math.PI * 1.2) / 26 + 0.02;
+      g.strokeStyle = hue(j); g.globalAlpha = 0.85; g.lineWidth = 17 - j * 0.55;
+      g.beginPath(); g.moveTo(92 + Math.cos(a0) * 60, 126 + Math.sin(a0) * 44); g.lineTo(92 + Math.cos(a1) * 60, 126 + Math.sin(a1) * 44); g.stroke();
+      g.fillStyle = hue(j + 3); g.globalAlpha = 0.9;
+      g.beginPath(); g.arc(92 + Math.cos(a0) * (71 - j * 0.3), 126 + Math.sin(a0) * (54 - j * 0.3), 2.4 - j * 0.05, 0, TAU); g.fill();
+    }
+    // The head: a long shield, in layers.
+    const head = (z) => { g.beginPath(); g.moveTo(0, 96 + (1 - z) * 30); g.lineTo(40 * z, 128); g.lineTo(47 * z, 164); g.lineTo(24 * z, 204); g.lineTo(0, 214 - (1 - z) * 16); g.closePath(); };
+    g.globalAlpha = 0.92; g.fillStyle = C.navy; head(1); g.fill();
+    for (let k = 0; k < 4; k++) { g.globalAlpha = 0.85; g.strokeStyle = hue(k * 2); g.lineWidth = 2; head(1 - k * 0.16); g.stroke(); }
+    // Eyes down the cheek. The big one is left blank here: its iris is drawn every frame, because it follows the ship.
+    [[21, 150, 12, 7, -0.25], [31, 131, 6.5, 3.6, -0.5], [14, 181, 5.5, 3.2, 0.3]].forEach(([ex, ey, rx, ry, tilt], i) => {
+      g.globalAlpha = 1; g.fillStyle = C.ink; g.beginPath(); g.ellipse(ex, ey, rx, ry, tilt, 0, TAU); g.fill();
+      g.strokeStyle = hue(i * 3 + 1); g.lineWidth = 1.4; g.stroke();
+      if (!i) return;
+      g.fillStyle = C.orange; g.beginPath(); g.arc(ex, ey, ry * 0.8, 0, TAU); g.fill();
+      g.fillStyle = C.void; g.beginPath(); g.arc(ex, ey, ry * 0.36, 0, TAU); g.fill();
+    });
+    g.globalAlpha = 0.9; g.strokeStyle = C.gold; g.lineWidth = 2.2; g.beginPath(); g.moveTo(6, 141); g.quadraticCurveTo(22, 129, 39, 139); g.stroke();
+    g.restore();
+  }
+  // Down the middle: a third eye, the bridge of a nose, and a mouth with too many teeth.
+  g.globalAlpha = 1; g.fillStyle = C.ink; g.beginPath(); g.ellipse(cx, 118, 4.5, 8, 0, 0, TAU); g.fill();
+  g.fillStyle = C.violet; g.beginPath(); g.arc(cx, 118, 3, 0, TAU); g.fill();
+  g.fillStyle = C.void; g.beginPath(); g.arc(cx, 118, 1.3, 0, TAU); g.fill();
+  g.strokeStyle = C.ink; g.globalAlpha = 0.8; g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(cx, 136); g.lineTo(cx - 7, 186); g.lineTo(cx, 192); g.lineTo(cx + 7, 186); g.closePath(); g.stroke();
+  g.beginPath(); g.moveTo(cx - 20, 197); g.quadraticCurveTo(cx, 209, cx + 20, 197); g.stroke();
+  g.fillStyle = C.ink; for (let i = -3; i <= 3; i++) g.fillRect(cx + i * 5 - 1.2, 199 + (9 - i * i) * 0.4, 2.4, 3.4);
+  // The light in its chest.
+  for (let r = 64; r > 6; r -= 6) { g.globalAlpha = 0.08; g.fillStyle = r > 34 ? C.violet : C.ink; g.beginPath(); g.arc(cx, oy, r, 0, TAU); g.fill(); }
+  // Dimmed a little all over, and more at the top (the status bar) and the bottom (where the ship flies), so the game still reads.
+  g.fillStyle = C.void;
+  g.globalAlpha = 0.2; g.fillRect(-12, -12, W + 24, H + 24);
+  for (let y = 0; y < 96; y += 6) { g.globalAlpha = 0.7 * (1 - y / 96); g.fillRect(-12, y, W + 24, 6); }
+  for (let y = 380; y < H + 12; y += 8) { g.globalAlpha = Math.min(0.9, 0.9 * (y - 380) / 200); g.fillRect(-12, y, W + 24, 8); }
+  g.globalAlpha = 1;
+}
+let backdrop = null;
+function realmBackdrop(turn) {
+  if (!backdrop || backdrop.w !== cv.width || backdrop.h !== cv.height || backdrop.turn !== turn) {
+    const c = document.createElement("canvas");
+    c.width = cv.width; c.height = cv.height;
+    const g = c.getContext("2d"), k = dpr * scale;
+    g.setTransform(k, 0, 0, k, 0, 0);
+    paintBackdrop(g, turn);
+    backdrop = { cv: c, w: cv.width, h: cv.height, turn };
+  }
+  return backdrop.cv;
+}
 function drawRealm(g) {
   const R = S.realm, P = S.player, t = S.t, cx = W / 2, cy = 300, cols = [C.pink, C.cyan, C.lime, C.gold];
   if (R.phase !== "fight") {
@@ -2110,19 +2251,23 @@ function drawRealm(g) {
     g.restore();
     return;
   }
-  // Inside: a tunnel of glowing shapes coming at you, with a mandala turning in the middle of it.
-  g.fillStyle = C.void; g.fillRect(-12, -12, W + 24, H + 24);
-  g.save(); g.translate(cx, 230);
-  for (let i = 0; i < 12; i++) {
-    const f = ((i + (reduced ? 0 : t * 0.6)) % 12) / 12, r = (16 + f * 340) * (1 + (reduced ? 0 : 0.07 * Math.sin(t * 2 + i))), sides = 3 + (i % 4), turn = (i % 2 ? 1 : -1) * (reduced ? 0 : t * 0.5) + i;
-    g.globalAlpha = 0.08 + 0.3 * (1 - f); g.strokeStyle = cols[i % 4]; g.lineWidth = 1.5 + f * 5;
+  // Inside: the painted backdrop, and over it the parts that move. A slow star turns round the light,
+  // the light breathes, and the two big eyes follow the ship.
+  const [ox, oy] = ORB, spin = reduced ? 0 : t * 0.25, beat = reduced ? 0 : Math.sin(t * 3);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(realmBackdrop(R.turn), 0, 0); g.restore();
+  g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = 0.4;
+  for (const rot of [spin, spin + Math.PI]) {
     g.beginPath();
-    for (let j = 0; j <= sides; j++) { const a = (j / sides) * TAU + turn; if (j) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
-    g.stroke();
+    for (let k = 0; k < 3; k++) { const a = rot + (k / 3) * TAU; if (k) g.lineTo(ox + Math.cos(a) * 118, oy + Math.sin(a) * 118); else g.moveTo(ox + Math.cos(a) * 118, oy + Math.sin(a) * 118); }
+    g.closePath(); g.stroke();
   }
-  g.restore(); g.globalAlpha = 1;
-  drawMandala(g, cx, 230, 150, t, 0.7);
-  drawPortal(g, cx, 230, 13, t);
+  g.globalAlpha = 0.55 + 0.2 * beat; g.fillStyle = C.ink; g.beginPath(); g.arc(ox, oy, 15 + 3 * beat, 0, TAU); g.fill();
+  g.globalAlpha = 1;
+  const look = clamp((P.x - ox) / 60, -1, 1) * 3.5;
+  for (const side of [-1, 1]) {
+    g.fillStyle = C.orange; g.beginPath(); g.arc(ox + side * 21 + look, 151, 5, 0, TAU); g.fill();
+    g.fillStyle = C.void; g.beginPath(); g.arc(ox + side * 21 + look, 151, 2.2, 0, TAU); g.fill();
+  }
   for (const e of R.elves) drawTripper(g, e.x, e.y, t, e.hue, TRIP[e.path], 1 + (e.hue % 5 ? 0 : 0.6) + (reduced ? 0 : 0.25 * Math.sin(t * 5 + e.hue)));
   for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + (reduced ? 0 : t * 8))) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, P.x + gx, P.y, t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
@@ -2438,7 +2583,7 @@ function start() {
   else if (reduced) { introSeen = true; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Guns overheat, tap Fire to rest them.", C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
-  fireOn = true; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
+  fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
   if (gyro.wanted && !gyro.on && TILT_OK) setGyro(true);
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true; $("sheet").hidden = true;
 }
@@ -2587,7 +2732,7 @@ document.addEventListener("pointermove", (e) => {
 // Called with no event (the page lost focus or was hidden), every finger is let go at once.
 const release = (e) => {
   const id = idOf(e);
-  if (e) fingers.delete(id); else fingers.clear();
+  if (e) fingers.delete(id); else { fingers.clear(); input.holdFire = false; }
   if (e && steerId !== null && id !== steerId) return;
   const next = fingers.keys().next();
   if (input.dragging && !next.done) { steerWith(next.value); return; }
@@ -2619,8 +2764,10 @@ addEventListener("blur", () => { input.left = input.right = input.up = input.dow
 $("play").addEventListener("click", start);
 $("again").addEventListener("click", start);
 // ---------- tilt steering: an opt-in setting on the thumb pad, for playing without touching the screen ----------
-// Tip the phone left or right and the ship goes there; level is the middle, 18 degrees is the wall. It fires by itself.
+// Tip the phone left or right and the ship goes there; level is the middle, 18 degrees is the wall.
+// Hold the Fire button to shoot, or tap it once to lock the guns on and play without touching the screen.
 // A finger on the screen still wins while it is down.
+const fireBtn = $("fire");
 const gyro = { on: false, g: 0, seen: false, wanted: store.get("sd-tilt", false) };
 const tiltBtn = $("tilt"), padHint = $("padHint");
 const TILT_OK = typeof DeviceOrientationEvent !== "undefined";
@@ -2630,7 +2777,7 @@ function syncGyro(note) {
   tiltBtn.textContent = gyro.on ? "Back to dragging" : "Steer by tilting";
   tiltBtn.setAttribute("aria-pressed", String(gyro.on));
   padHint.textContent = note || (gyro.on
-    ? "Tilt steering is on. Tip the phone left and right.\nIt fires by itself."
+    ? "Tilt steering is on. Tip left and right.\nHold Fire to shoot, or tap it to lock it."
     : "Thumb goes down here.\nDrag anywhere to fly and shoot.");
 }
 addEventListener("deviceorientation", (e) => {
@@ -2646,19 +2793,43 @@ async function setGyro(on) {
     if (answer !== "granted") { gyro.wanted = false; store.set("sd-tilt", false); syncGyro("Tilt was blocked.\nAllow motion access, then try again."); return; }
   }
   gyro.on = on; gyro.wanted = on; gyro.seen = false; store.set("sd-tilt", on);
-  syncGyro();
+  // Tilt starts with the guns unlocked (hold to fire); dragging starts with them on.
+  fireOn = !on; input.holdFire = false;
+  syncGyro(); syncFire();
   // No tilt reading within two seconds means there is no sensor to steer with.
-  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); } }, 2000);
+  if (on) setTimeout(() => { if (gyro.on && !gyro.seen) { gyro.on = false; fireOn = true; syncGyro("This phone isn't reporting tilt,\nso it's back to dragging."); syncFire(); } }, 2000);
 }
 tiltBtn.addEventListener("click", () => { setGyro(!gyro.on); tiltBtn.blur(); });
 syncGyro();
 // A saved choice comes back on its own where no permission is needed. On an iPhone it comes back at the next Play tap.
 if (gyro.wanted && TILT_OK && typeof DeviceOrientationEvent.requestPermission !== "function") setGyro(true);
 
-const fireBtn = $("fire");
-function syncFire() { fireBtn.textContent = fireOn ? "Fire on" : "Fire off"; fireBtn.setAttribute("aria-pressed", String(fireOn)); }
+function syncFire() {
+  const hold = gyro.on;
+  fireBtn.textContent = hold ? (fireOn ? "Fire locked on" : "Hold to fire") : fireOn ? "Fire on" : "Fire off";
+  fireBtn.setAttribute("aria-pressed", String(hold ? fireOn || input.holdFire : fireOn));
+  fireBtn.classList.toggle("hold", hold);
+}
 function toggleFire() { fireOn = !fireOn; syncFire(); }
-fireBtn.addEventListener("click", () => { toggleFire(); fireBtn.blur(); });
+fireBtn.addEventListener("click", () => { if (!gyro.on) toggleFire(); fireBtn.blur(); });
+// With tilt steering: down is fire, up is stop, and a press shorter than a quarter of a second flips the lock.
+let heldAt = 0;
+fireBtn.addEventListener("pointerdown", (e) => {
+  if (!gyro.on) return;
+  e.preventDefault();
+  try { fireBtn.setPointerCapture(e.pointerId); } catch {}
+  ensureAudio();
+  input.holdFire = true; heldAt = performance.now(); syncFire();
+});
+const letGo = (e) => {
+  if (!input.holdFire) return;
+  input.holdFire = false;
+  if (gyro.on && e.type === "pointerup" && performance.now() - heldAt < 250) fireOn = !fireOn;
+  syncFire();
+};
+fireBtn.addEventListener("pointerup", letGo);
+fireBtn.addEventListener("pointercancel", letGo);
+fireBtn.addEventListener("lostpointercapture", letGo);
 syncFire();
 const muteBtn = $("mute");
 function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
