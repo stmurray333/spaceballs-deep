@@ -277,7 +277,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v16</span>
+  <span id="ver">v17</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -502,7 +502,7 @@ function drawDrop(g, kind, x, y, t) {
     g.shadowColor = C.lime; g.shadowBlur = 10;
     g.fillStyle = C.void; g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.fill();
     g.shadowBlur = 0; g.lineWidth = 2.4; g.lineCap = "round";
-    [C.lime, C.pink, C.cyan].forEach((c, i) => { g.strokeStyle = c; g.beginPath(); g.arc(0, 0, 8.5, t * 5 + i * 2.1, t * 5 + i * 2.1 + 1.5); g.stroke(); });
+    [C.lime, C.pink, C.cyan].forEach((c, i) => { g.strokeStyle = c; g.beginPath(); g.arc(0, 0, 8.5, (reduced ? 0 : t * 5) + i * 2.1, (reduced ? 0 : t * 5) + i * 2.1 + 1.5); g.stroke(); });
   } else if (kind === "candy") {
     g.shadowColor = C.ink; g.shadowBlur = 10;
     g.fillStyle = C.ink; g.fillRect(-7, -8, 14, 16);
@@ -999,7 +999,7 @@ let S = null;
 
 function newState() {
   return {
-    mode: "play", t: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
+    mode: "play", t: 0, wt: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
     turbo: 0, crash: 0, escort: null, beamer: null, heat: 0, hot: false, dual: false, rescue: null, bump: 0, bumpWave: 0, realm: null, dmtWave: 0,
@@ -1384,7 +1384,7 @@ function hurt(title, sub) {
   S.lives--; P.inv = 2.2; S.shake = 0.5;
   burst(P.x, P.y, C.gold, 26); sfx.hurt();
   banner(title, sub, C.red);
-  if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; input.touchFire = false; }
+  if (S.lives <= 0) { S.mode = "dying"; S.overT = 1.6; S.bump = 0; S.realm = null; input.touchFire = false; }
 }
 
 // ---------- the DMT realm, as ordered by Jeremy: a black hole opens, and on the far side machine elves pay cash ----------
@@ -1403,6 +1403,8 @@ function elfAt(path, u) {
 function enterRealm() {
   const P = S.player;
   S.realm = { phase: "in", t: 0, x: P.x, y: P.y, elves: [], sent: 0, killed: 0, cents: 0 };
+  // Nothing can touch you once the portal is open, including a shot landing in the same frame as the pickup.
+  P.inv = Math.max(P.inv, 0.1);
   S.stats.trips++; S.bullets = [];
   banner("DMT", "The portal is open. Machine elves pay cash.", C.lime); sfx.power();
 }
@@ -1421,7 +1423,7 @@ function updateRealm(dt) {
   if (R.phase === "in") {
     if (R.t >= REALM.in) { R.phase = "fight"; R.t = 0; P.x = W / 2; P.y = Y_MAX; input.target = P.x; input.targetY = P.y; }
   } else if (R.phase === "fight") {
-    updatePlayer(dt);
+    if (S.mode === "play") updatePlayer(dt);
     while (R.sent < all && R.t >= 0.5 + Math.floor(R.sent / REALM.per) * REALM.every + (R.sent % REALM.per) * 0.22) {
       R.elves.push({ path: Math.floor(R.sent / REALM.per), age: 0, hue: R.sent, x: -99, y: -99 }); R.sent++;
     }
@@ -1710,7 +1712,9 @@ function update(dt) {
   }
   if (S.bump > 0) { S.bump = Math.max(0, S.bump - dt); return; }
   S.t += dt;
-  S.sway = Math.sin(S.t * 0.7) * 16;
+  // The formation sways on the world's own clock, which stops while you are away in the realm, so nothing has jumped when you get back.
+  if (!S.realm) S.wt += dt;
+  S.sway = Math.sin(S.wt * 0.7) * 16;
   S.shake = Math.max(0, S.shake - dt);
   if (S.banner) { S.banner.life -= dt; if (S.banner.life <= 0) S.banner = null; }
   const P = S.player;
@@ -1998,7 +2002,7 @@ function drawMandala(g, x, y, r, t, alpha) {
     g.globalAlpha = alpha * (0.55 - ring * 0.08); g.strokeStyle = cols[ring];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU + spin, px = Math.cos(a) * out, py = Math.sin(a) * out;
-      g.beginPath(); g.ellipse(px, py, r * 0.12, r * 0.045 * (1 + 0.3 * Math.sin(t * 3 + ring)), a, 0, TAU); g.stroke();
+      g.beginPath(); g.ellipse(px, py, r * 0.12, r * 0.045 * (1 + (reduced ? 0 : 0.3 * Math.sin(t * 3 + ring))), a, 0, TAU); g.stroke();
     }
   }
   g.restore(); g.globalAlpha = 1;
@@ -2010,7 +2014,7 @@ function drawRealm(g) {
     const k = clamp(R.t / (R.phase === "in" ? REALM.in : REALM.out), 0, 1), f = R.phase === "in" ? k : 1 - k;
     drawMandala(g, cx, cy, 190, t, f);
     drawPortal(g, cx, cy, 8 + ease(Math.min(1, f * 1.6)) * 62, t);
-    const turn = f * 9, far = (1 - f) * Math.hypot(R.x - cx, R.y - cy), from = Math.atan2(R.y - cy, R.x - cx), z = 1 - f * 0.85;
+    const turn = reduced ? 0 : f * 9, far = (1 - f) * Math.hypot(R.x - cx, R.y - cy), from = Math.atan2(R.y - cy, R.x - cx), z = 1 - f * 0.85;
     g.save(); g.translate(cx + Math.cos(from + turn) * far, cy + Math.sin(from + turn) * far); g.rotate(turn * 1.5); g.scale(z, z);
     for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, gx, 0, t, false, false);
     g.restore();
@@ -2030,7 +2034,7 @@ function drawRealm(g) {
   drawMandala(g, cx, 230, 150, t, 0.7);
   drawPortal(g, cx, 230, 13, t);
   for (const e of R.elves) drawElf(g, e.x, e.y, t, e.hue);
-  for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + t * 8)) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
+  for (const s of S.bullets) { g.fillStyle = cols[Math.abs(Math.floor(s.y / 60 + (reduced ? 0 : t * 8))) % 4]; g.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   for (const gx of S.dual ? [-11, 11] : [0]) drawPlayer(g, P.x + gx, P.y, t, S.turbo > 0 || S.tweak > 0, S.std.crabs);
   for (const p of S.parts) { g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.color; g.fillRect(p.x, p.y, p.size, p.size); }
   g.globalAlpha = 1;
