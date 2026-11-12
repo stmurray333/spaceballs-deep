@@ -303,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v28</span>
+  <span id="ver">v29</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -2224,7 +2224,7 @@ function drawHUD(g) {
   if (S.escort && S.escort.free) {
     g.fillStyle = C.gold; g.fillText(`THE HOT ONE · on the house · ${Math.ceil(S.escort.life)}s`, W / 2, y);
   } else if (S.escort) {
-    g.fillStyle = C.pink; g.fillText(`ESCORT ON THE CLOCK · -$1.00/s · ${Math.ceil(S.escort.life)}s`, W / 2, y);
+    g.fillStyle = C.pink; g.fillText(S.escort.comp ? `ESCORT · on the house · ${Math.ceil(S.escort.life)}s` : `ESCORT ON THE CLOCK · -$1.00/s · ${Math.ceil(S.escort.life)}s`, W / 2, y);
   }
   const stds = [
     S.std.clap && "THE CLAP", S.std.crabs && "CRABS",
