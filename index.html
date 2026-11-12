@@ -303,7 +303,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v27</span>
+  <span id="ver">v28</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -397,7 +397,7 @@ const sfx = {
   warn: () => { tone(660, 0.1, "square", 0.03); tone(660, 0.1, "square", 0.03, 0, 0.16); },
   crash: () => tone(400, 0.8, "sine", 0.06, 90),
   broke: () => { tone(300, 0.25, "square", 0.04, 0, 0); tone(200, 0.4, "square", 0.04, 0, 0.22); },
-  laugh: () => { for (let i = 0; i < 8; i++) tone(i % 2 ? 175 : 233, 0.12, "sawtooth", 0.045, i % 2 ? 140 : 185, i * 0.16); },
+  laugh: (i) => tone(i % 2 ? 175 : 233, 0.12, "sawtooth", 0.045, i % 2 ? 140 : 185),
   eshot: () => tone(260, 0.1, "sawtooth", 0.03, 120),
   crow: () => { tone(520, 0.08, "sawtooth", 0.035, 0, 0); tone(700, 0.08, "sawtooth", 0.035, 0, 0.09); tone(620, 0.08, "sawtooth", 0.035, 0, 0.18); tone(880, 0.35, "sawtooth", 0.035, 440, 0.27); },
   tweet: () => { tone(2400, 0.05, "sine", 0.03, 3100); tone(2700, 0.05, "sine", 0.03, 3300, 0.08); },
@@ -1590,7 +1590,8 @@ function hurt(title, sub) {
 
 // ---------- the mugging: a prank, by order of Stephen, who says it is coming out again later ----------
 // The first time a game's cash reaches $1,000 the lights go out, Gangster Scuba Steve swims up, smacks the ship,
-// takes every cent, laughs about it and swims off. Nothing else is lost, and the game carries on from where it stopped.
+// takes every cent, laughs about it and swims off. Nothing else is lost, and the game carries on from where it stopped:
+// an escort on the clock stays for nothing, since with empty pockets she would walk out before the banner had been read.
 // It happens once a game. To switch the whole thing off, set PRANK to false.
 const PRANK = true;
 const MUG = { at: 100000, smack: 1.7, take: 2.1, laugh: 3.4, leave: 4.8, len: 5.5 };
@@ -1601,9 +1602,12 @@ function mugTick(dt) {
   const now = (k) => was < MUG[k] && M.t >= MUG[k];
   if (now("smack")) { S.shake = 0.6; sfx.hurt(); }
   if (now("take")) { M.took = Math.max(0, S.cents); S.cents -= M.took; S.stats.robbedCents += M.took; sfx.broke(); }
-  if (now("laugh")) sfx.laugh();
+  // He laughs a "ha" at a time, so switching the sound off or leaving the page stops him at once.
+  while (M.ha < 8 && M.t >= MUG.laugh + M.ha * 0.16) sfx.laugh(M.ha++);
   if (M.t >= MUG.len) {
     S.mug = null; S.player.inv = Math.max(S.player.inv, 2);
+    const E = S.escort;
+    if (E && !E.free) { E.comp = true; pop("On the house, sugar.", E.x, E.y - 24, C.pink, 15); }
     banner("Robbed", `Gangster Scuba Steve took all ${money(M.took)} of it. Carry on.`, C.red);
   }
 }
@@ -1986,7 +1990,9 @@ function update(dt) {
   // The mugging stops the world the same way, for longer. It waits for a blackout or a trip to finish first.
   if (S.mug) { mugTick(dt); return; }
   if (PRANK && !S.stats.robbed && S.mode === "play" && S.cents >= MUG.at && !S.realm && S.blackout <= 0) {
-    S.stats.robbed = 1; S.mug = { t: 0, took: 0 }; S.bullets = [];
+    // Nothing else moves on the frame he arrives, and a Waffle House flash still on screen is put away.
+    S.stats.robbed = 1; S.mug = { t: 0, took: 0, ha: 0 }; S.bullets = []; S.wipe = 0;
+    return;
   }
   S.wipe = Math.max(0, S.wipe - dt);
   S.t += dt;
@@ -2034,12 +2040,12 @@ function update(dt) {
     E.x += (P.x + side * 36 - E.x) * Math.min(1, dt * 6); E.y += (P.y + 4 - E.y) * Math.min(1, dt * 6);
     E.cd -= dt;
     if (E.cd <= 0 && S.mode === "play") { S.bullets.push({ x: E.x, y: E.y - 12, vy: -470, heart: true, gold: E.free }); E.cd = E.free ? 0.16 : 0.3; }
-    if (!E.free) {
+    if (!E.free && !E.comp) {
       E.tick += dt;
       while (E.tick >= 0.25) { E.tick -= 0.25; S.cents -= 25; S.stats.escortCents += 25; }
     }
     E.life -= dt;
-    if (!E.free && S.cents < 0) { pop("She left. You're broke.", E.x, E.y - 24, C.pink, 15); S.escort = null; afterEscort(E); }
+    if (!E.free && !E.comp && S.cents < 0) { pop("She left. You're broke.", E.x, E.y - 24, C.pink, 15); S.escort = null; afterEscort(E); }
     else if (E.life <= 0) { pop(E.free ? "The hot one has other plans." : "Time's up, sugar.", E.x, E.y - 24, C.pink, 15); S.escort = null; afterEscort(E); }
   }
 
@@ -2570,7 +2576,7 @@ function drawRealm(g) {
 // Gangster Scuba Steve: wetsuit, tank, mask and flippers; red bandana, gold chain with a dollar sign on it, rings.
 // slap runs 0 to 1 through the wind-up and the swing, laugh is how hard he is laughing, loot is how full the sack is.
 function drawSteve(g, x, y, t, slap, laugh, loot) {
-  g.save(); g.translate(x, y + Math.sin(t * 24) * 3 * laugh); g.scale(1.5, 1.5);
+  g.save(); g.translate(x, y + (reduced ? 0 : Math.sin(t * 24) * 3 * laugh)); g.scale(1.5, 1.5);
   g.lineCap = "round"; g.lineJoin = "round";
   // The tank on his back and the hose round to his mouth.
   g.fillStyle = C.dim; g.fillRect(-27, -28, 13, 44);
