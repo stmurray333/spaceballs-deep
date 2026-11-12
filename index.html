@@ -277,7 +277,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v15</span>
+  <span id="ver">v16</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1474,11 +1474,13 @@ function wobble() {
   return w;
 }
 function drink() {
-  const P = S.player;
+  const P = S.player, was = drunkLevel();
   S.stats.beers++; S.drinks += 1; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
   S.stats.peakBac = Math.max(S.stats.peakBac, bac());
   pop(`*GLUG* pay and power x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
   if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more and your shots hit harder when you're drunk. Your aim does not improve.", C.gold); }
+  // Jeremy's pop-ups: when things go sideways, say what to grab next.
+  else if (was < 3 && drunkLevel() === 3 && S.drinks <= 4 && !wired()) banner("You're hammered", "Find some booger sugar, quick.", C.gold);
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
   if (S.drinks > 4) { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
 }
@@ -1549,7 +1551,10 @@ function updateVices(dt) {
   if (S.drinks > 0) {
     S.drinks = Math.max(0, S.drinks - dt / 12);
     if (S.drinks === 0) {
-      if (S.peak >= 3) { S.hangover = 5; pop("HANGOVER", P.x, P.y - 34, C.dim, 20); sfx.crash(); }
+      if (S.peak >= 3) {
+        S.hangover = 5; pop("HANGOVER", P.x, P.y - 34, C.dim, 20); sfx.crash();
+        if (!S.seen.hang) { S.seen.hang = true; banner("Hungover", "Everything is slow. Hair of the dog: grab a beer.", C.dim); }
+      }
       S.peak = 0;
     }
   } else if (S.hangover > 0) S.hangover = Math.max(0, S.hangover - dt);
@@ -1619,6 +1624,7 @@ function updatePlayer(dt) {
       if (S.heat >= 1) {
         S.heat = 1; S.hot = true; S.stats.overheats++;
         pop("OVERHEATED", P.x, P.y - 34, C.red, 20); burst(P.x, P.y - 16, C.ink, 10); sfx.broke();
+        if (!S.seen.hot) { S.seen.hot = true; banner("Guns overheated", "Locked till they cool. Rest them with the Fire button, or find some nose candy.", C.red); }
       }
     }
   }
