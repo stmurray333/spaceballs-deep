@@ -199,6 +199,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
       <div class="item"><canvas data-icon="cop" aria-hidden="true"></canvas><div><b>DUI checkpoint</b><span>Dodge the light</span></div></div>
       <div class="item"><canvas data-icon="rubber" aria-hidden="true"></canvas><div><b>Rubber</b><span>Blocks her STDs</span></div></div>
       <div class="item"><canvas data-icon="clinic" aria-hidden="true"></canvas><div><b>Free clinic</b><span>Cure. $20 co-pay</span></div></div>
+      <div class="item"><canvas data-icon="dime" aria-hidden="true"></canvas><div><b>Dime bag</b><span>Slows them all down</span></div></div>
+      <div class="item"><canvas data-icon="eighth" aria-hidden="true"></canvas><div><b>Eighth</b><span>Longer. More snacks</span></div></div>
     </div>
     <p class="rule">Hold and drag to fly and shoot. Every shot costs ten cents. Dodge the red stuff.</p>
     <div class="row">
@@ -236,7 +238,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v6</span>
+  <span id="ver">v7</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
@@ -325,6 +327,7 @@ const sfx = {
   siren: () => [0, 1, 2, 3].forEach((i) => tone(i % 2 ? 620 : 880, 0.2, "square", 0.025, 0, i * 0.2)),
   sick: () => { tone(300, 0.3, "sawtooth", 0.04, 140); tone(200, 0.45, "sawtooth", 0.04, 90, 0.25); },
   burp: () => tone(110, 0.45, "sawtooth", 0.06, 55),
+  puff: () => { hiss(0.6, 0.07, 600); tone(180, 0.5, "sine", 0.04, 120); },
 };
 
 // ---------- sizing ----------
@@ -480,6 +483,20 @@ function drawDrop(g, kind, x, y, t) {
     g.fillStyle = C.ink; g.fillRect(-8.5, -8.5, 17, 17);
     g.shadowBlur = 0;
     g.fillStyle = C.red; g.fillRect(-2.5, -6, 5, 12); g.fillRect(-6, -2.5, 12, 5);
+  } else if (kind === "dime" || kind === "eighth") {
+    const big = kind === "eighth", w = big ? 9.5 : 7, h = big ? 10.5 : 8;
+    g.shadowColor = C.lime; g.shadowBlur = 10;
+    g.globalAlpha = 0.3; g.fillStyle = C.lime; g.fillRect(-w, -h, w * 2, h * 2);
+    g.globalAlpha = 1; g.shadowBlur = 0;
+    g.strokeStyle = C.ink; g.lineWidth = 1.2; g.strokeRect(-w, -h, w * 2, h * 2);
+    g.fillStyle = big ? C.gold : C.pink; g.fillRect(-w, -h, w * 2, 2.5);
+    g.fillStyle = C.lime;
+    const buds = big ? [[-4, 4, 4], [3.5, 5, 4], [0, -0.5, 4.2], [-5.5, -3, 2.5], [5.5, -2.5, 2.5]] : [[-2.5, 3, 3], [2.5, 3.5, 3], [0, -1, 2.8]];
+    for (const [bx, by, br] of buds) { g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill(); }
+    if (big) {
+      g.fillStyle = C.void; g.font = `6px ${FONT_SIGN}`; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("1/8", 0, 2.5);
+    }
   } else {
     g.shadowColor = C.gold; g.shadowBlur = 10;
     g.fillStyle = C.navy; g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill();
@@ -699,28 +716,48 @@ function newState() {
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
     turbo: 0, crash: 0, escort: null, beamer: null,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
+    high: 0, slow: 1, munch: 0, introT: 0, introBoom: false,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
     flyers: [], flyTimer: 8, flyIdx: 0, seen: {}, boss: null, bossCount: 0,
     diveTimer: 3, nextWave: 0, banner: null, shake: 0, overT: 0, brokeQuoted: false,
     stats: {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
-      beers: 0, duis: 0, texts: 0, stds: [],
+      beers: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0,
     },
   };
 }
 const slotX = (b) => 54 + b.col * 36 + S.sway;
 const slotY = (b) => 112 + b.row * 34;
 
+// The bugs roll in one squad at a time, each squad a string that swoops in, does a loop and peels off to its slots.
+const SQUADS = [3, 1, 4, 2, 0];
 function spawnWave() {
   S.bugs = [];
-  LAYOUT.forEach(([type, cols], row) => cols.forEach((col, i) => {
-    S.bugs.push({
-      type, row, col, hp: type === "choker" ? 2 : 1, x: -99, y: -99,
-      state: "enter", p: 0, dur: 1.4, delay: row * 0.35 + i * 0.07,
-      side: col < 4 ? -1 : 1, flash: 0, ph: Math.random() * TAU,
+  const gap = Math.max(0.7, 1.25 - (S.wave - 1) * 0.05), dur = Math.max(1.6, 2.2 - (S.wave - 1) * 0.04);
+  SQUADS.forEach((row, k) => {
+    const [type, cols] = LAYOUT[row], side = k % 2 ? 1 : -1;
+    cols.forEach((col, i) => {
+      S.bugs.push({
+        type, row, col, hp: type === "choker" ? 2 : 1, x: -99, y: -99,
+        state: "enter", p: 0, dur, delay: k * gap + i * 0.12,
+        side, fromY: k === 1 || k === 3 ? 250 : -30, flash: 0, ph: Math.random() * TAU,
+      });
     });
-  }));
+  });
   S.diveTimer = 3;
+}
+function entryPoint(b, p, sx, sy) {
+  const m = b.side, R = 46, cx = W / 2 - m * 20, bot = 320 + R;
+  if (p < 0.5) {
+    const t = p / 0.5;
+    return [bez3(W / 2 + m * 230, W / 2 + m * 120, cx + m * 70, cx, t), bez3(b.fromY, b.fromY + 40, bot + 30, bot, t)];
+  }
+  if (p < 0.78) {
+    const a = Math.PI / 2 + m * ((p - 0.5) / 0.28) * TAU;
+    return [cx + Math.cos(a) * R, bot - R + Math.sin(a) * R];
+  }
+  const t = ease((p - 0.78) / 0.22);
+  return [cx + (sx - cx) * t, bot + (sy - bot) * t];
 }
 function banner(title, sub, color) { S.banner = { title, sub, color, life: 2.6, max: 2.6 }; }
 function pop(text, x, y, color, size = 16) { S.pops.push({ text, x, y, color, size, life: 1 }); }
@@ -916,6 +953,8 @@ function hitBug(b) {
   else if (r < 0.22) kind = "beer";
   else if (r < 0.26 && S.rubbers < 3) kind = "rubber";
   else if (r < 0.32 && sick()) kind = "clinic";
+  else if (r < 0.36) kind = "dime";
+  else if (r < 0.375) kind = "eighth";
   if (kind) S.drops.push({ kind, x: b.x, y: b.y, vy: 85 });
 }
 function collect(kind) {
@@ -938,6 +977,8 @@ function collect(kind) {
     if (!S.seen.rubber) { S.seen.rubber = true; banner("Rubber", "Blocks whatever your next escort is carrying.", C.cyan); }
   } else if (kind === "clinic") {
     clinic();
+  } else if (kind === "dime" || kind === "eighth") {
+    smoke(kind === "eighth");
   } else {
     S.lives++; S.stats.cody++;
     banner("Navy SEAL Cody", "has entered the chat. +1 life", C.gold); sfx.power();
@@ -975,7 +1016,7 @@ function wobble() {
 function drink() {
   const P = S.player;
   S.stats.beers++; S.drinks += 1; S.peak = Math.max(S.peak, S.drinks); S.hangover = 0;
-  pop("*GLUG*", P.x, P.y - 30, C.gold, 20); sfx.glug();
+  pop(`*GLUG* pay x${payMult()}`, P.x, P.y - 30, C.gold, 20); sfx.glug();
   if (!S.seen.beer) { S.seen.beer = true; banner("Liquid courage", "Bugs pay more when you're drunk. Your aim does not improve.", C.gold); }
   // One too many: lights out for a couple of seconds. Nothing can hurt you, and you wake up to a phone bill.
   if (S.drinks > 4) { S.blackout = 2.4; S.drinks = 2.5; P.inv = Math.max(P.inv, 2.8); }
@@ -1016,8 +1057,25 @@ function clinic() {
   const news = !had ? "Nothing wrong with you." : S.std.herpes ? "Shot in the ass. The herpes is only napping." : "Shot in the ass. You're clean.";
   banner("Free clinic", news + " $20 co-pay.", C.lime); sfx.power();
 }
+// Dime bags and eighths: the bugs, their shots and the cops all slow down while you're high. The munchies bill comes after.
+function smoke(big) {
+  const P = S.player;
+  S.stats.weed++;
+  S.high = Math.min(20, S.high + (big ? 12 : 6)); S.slow = big ? 0.45 : Math.min(S.slow, 0.6);
+  S.munch += big ? 1000 : 500;
+  pop(big ? "*BIG HIT*" : "*PUFF*", P.x, P.y - 30, C.lime, 20); sfx.puff();
+  if (!S.seen.weed) { S.seen.weed = true; banner("High", "Everything slows down. The munchies bill comes later.", C.lime); }
+}
 function updateVices(dt) {
   const P = S.player;
+  if (S.high > 0) {
+    S.high -= dt;
+    if (S.high <= 0) {
+      S.high = 0; S.slow = 1; S.cents -= S.munch; S.stats.munchCents += S.munch;
+      pop(`MUNCHIES -${money(S.munch)}`, P.x, P.y - 34, C.lime, 20); sfx.broke();
+      S.munch = 0;
+    }
+  }
   if (S.drinks > 0) {
     S.drinks = Math.max(0, S.drinks - dt / 12);
     if (S.drinks === 0) {
@@ -1079,9 +1137,7 @@ function updateBugs(dt) {
     const sx = slotX(b), sy = slotY(b);
     if (b.state === "enter") {
       b.p = Math.min(1, b.p + dt / b.dur);
-      const t = ease(b.p);
-      b.x = bez2(W / 2 + b.side * 230, W / 2 - b.side * 60, sx, t);
-      b.y = bez2(-30, 330, sy, t);
+      [b.x, b.y] = entryPoint(b, b.p, sx, sy);
       if (b.p >= 1) b.state = "form";
     } else if (b.state === "form") {
       b.x = sx; b.y = sy + Math.sin(S.t * 2 + b.ph) * 1.5;
@@ -1136,10 +1192,16 @@ function updateFx(dt) {
   S.pops = S.pops.filter((p) => p.life > 0);
 }
 function update(dt) {
-  const boost = S && S.turbo > 0 ? 3 : S && S.crash > 0 ? 0.4 : 1;
+  const boost = S && (S.turbo > 0 || S.mode === "intro") ? 3 : S && S.crash > 0 ? 0.4 : S && S.high > 0 ? 0.5 : 1;
   updateStars(dt, boost);
   if (!S) return;
   if (S.mode === "over") { updateFx(dt); return; }
+  if (S.mode === "intro") {
+    S.introT += dt;
+    if (!S.introBoom && S.introT >= 1.5) { S.introBoom = true; sfx.boom(); }
+    if (S.introT >= INTRO) { S.mode = "play"; banner("Wave 1", "U.S.S. Mike Honcho, reporting for duty. Every shot costs ten cents.", C.cyan); }
+    return;
+  }
   S.t += dt;
   S.sway = Math.sin(S.t * 0.7) * 16;
   S.shake = Math.max(0, S.shake - dt);
@@ -1153,8 +1215,10 @@ function update(dt) {
   } else if (S.crash > 0) S.crash = Math.max(0, S.crash - dt);
   updateVices(dt);
 
+  // While you're high, everything that is out to get you runs slow. You don't.
+  const edt = dt * (S.high > 0 ? S.slow : 1);
   if (S.mode === "play") updatePlayer(dt);
-  updateBugs(dt);
+  updateBugs(edt);
   if (S.mode === "play" && !S.boss) {
     S.flyTimer -= dt;
     if (S.flyTimer <= 0) {
@@ -1164,13 +1228,13 @@ function update(dt) {
       S.flyTimer = kind === "keg" ? rand(8, 11) : rand(12, 17);
     }
   }
-  updateBoss(dt);
-  updateFlyers(dt);
+  updateBoss(edt);
+  updateFlyers(edt);
 
   for (const s of S.bullets) { s.x += (s.vx || 0) * dt; s.y += s.vy * dt; }
   for (const e of S.ebullets) {
-    if (e.home) e.vx = clamp(e.vx + Math.sign(P.x - e.x) * e.home * 2 * dt, -e.home, e.home);
-    e.x += e.vx * dt; e.y += e.vy * dt;
+    if (e.home) e.vx = clamp(e.vx + Math.sign(P.x - e.x) * e.home * 2 * edt, -e.home, e.home);
+    e.x += e.vx * edt; e.y += e.vy * edt;
   }
   for (const d of S.drops) d.y += d.vy * dt;
 
@@ -1330,6 +1394,7 @@ function drawHUD(g) {
   } else if (S.crash > 0) {
     g.fillStyle = C.dim; g.fillText("THE CRASH · everything is slow", W / 2, y); y += 16;
   }
+  if (S.high > 0) { g.fillStyle = C.lime; g.fillText(`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, W / 2, y); y += 16; }
   if (S.escort && S.escort.free) {
     g.fillStyle = C.gold; g.fillText(`THE HOT ONE · on the house · ${Math.ceil(S.escort.life)}s`, W / 2, y); y += 16;
   } else if (S.escort) {
@@ -1365,8 +1430,9 @@ function render() {
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, C.void); bg.addColorStop(1, C.deep);
   ctx.fillStyle = bg; ctx.fillRect(-12, -12, W + 24, H + 24);
-  drawStars(ctx, S && S.turbo > 0 ? 3 : 1);
+  drawStars(ctx, S && (S.turbo > 0 || S.mode === "intro") ? 3 : 1);
   if (!S) return;
+  if (S.mode === "intro") { drawIntro(ctx); return; }
 
   // Past two drinks the room tilts. Ships, bugs and shots tilt together, so what you see is still what hits.
   const sloshed = reduced ? 0 : Math.max(0, Math.min(S.drinks, 4) - 1);
@@ -1422,6 +1488,7 @@ function render() {
     ctx.globalAlpha = 0.32; ctx.fillStyle = C.void; ctx.fillRect(-12, -12, W + 24, H + 24);
     ctx.globalAlpha = 0.12; ctx.fillStyle = C.dim; ctx.fillRect(-12, -12, W + 24, H + 24);
   }
+  if (S.high > 0) { ctx.globalAlpha = 0.08; ctx.fillStyle = C.lime; ctx.fillRect(-12, -12, W + 24, H + 24); }
   ctx.globalAlpha = 1;
 
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -1449,6 +1516,50 @@ function render() {
 }
 
 // ---------- screens ----------
+// ---------- the intro: a splash page for the ship, the first time you hit Play ----------
+const INTRO = 4.4;
+let introSeen = false;
+function drawIntro(g) {
+  const t = S.introT, cx = W / 2;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  if (t < 0.7) {
+    g.font = `18px ${FONT_HUD}`; g.fillStyle = C.dim; g.fillText("LOADING INTRO", cx, H / 2 - 20);
+    g.strokeStyle = C.dim; g.lineWidth = 1; g.strokeRect(cx - 80, H / 2 - 5, 160, 10);
+    g.fillStyle = C.pink; g.fillRect(cx - 78, H / 2 - 3, 156 * Math.min(1, t / 0.6), 6);
+    return;
+  }
+  const rise = ease(clamp((t - 0.7) / 1.1, 0, 1));
+  const glow = g.createRadialGradient(cx, 380, 10, cx, 380, 220);
+  glow.addColorStop(0, C.pink); glow.addColorStop(1, C.void);
+  g.globalAlpha = 0.3 * rise; g.fillStyle = glow; g.fillRect(0, 150, W, 460);
+  g.globalAlpha = 1;
+  g.save(); g.translate(cx, H + 150 - rise * (H + 150 - 372) + Math.sin(t * 3) * 4); g.scale(5, 5);
+  drawPlayer(g, 0, 0, t, false);
+  g.restore();
+  g.fillStyle = C.void; g.fillRect(0, 0, W, 44); g.fillRect(0, H - 44, W, 44);
+  g.fillStyle = C.pink; g.fillRect(0, 44, W, 1); g.fillRect(0, H - 45, W, 1);
+  if (t > 1.2) {
+    g.globalAlpha = clamp((t - 1.2) / 0.3, 0, 1);
+    g.font = `11px ${FONT_SIGN}`; g.fillStyle = C.dim; g.fillText("P R E S E N T I N G", cx, 84);
+  }
+  if (t > 1.5) {
+    const k = 1 + 0.6 * (1 - clamp((t - 1.5) / 0.25, 0, 1));
+    g.globalAlpha = clamp((t - 1.5) / 0.15, 0, 1);
+    g.save(); g.translate(cx, 150); g.scale(k, k);
+    g.font = `22px ${FONT_SIGN}`; g.fillStyle = C.gold; g.shadowColor = C.gold; g.shadowBlur = 12; g.fillText("THE U.S.S.", 0, -26);
+    g.font = `36px ${FONT_SIGN}`; g.fillStyle = C.pink; g.shadowColor = C.pink; g.shadowBlur = 16; g.fillText("MIKE HONCHO", 0, 6);
+    g.restore();
+  }
+  if (t > 2.3) {
+    g.globalAlpha = clamp((t - 2.3) / 0.3, 0, 1);
+    g.font = `19px ${FONT_HUD}`; g.fillStyle = C.ink; g.fillText("Twin thrusters. Zero shame.", cx, 204);
+    g.fillStyle = C.gold; g.fillText("Commissioned by Jeremy.", cx, 224);
+  }
+  g.globalAlpha = Math.floor(t * 2.5) % 2 ? 0.35 : 0.9;
+  g.font = `16px ${FONT_HUD}`; g.fillStyle = C.dim; g.fillText("tap to skip intro", cx, H - 22);
+  g.globalAlpha = 1;
+}
+
 function rankFor(c) {
   if (c < 0) return "Broke and tapped out";
   if (c < 5000) return "Green bubble energy";
@@ -1473,6 +1584,7 @@ function showOver() {
     ["STDs caught", stds ? stds[0].toUpperCase() + stds.slice(1) : "None. Somehow."],
     ["Cocks / tits", `${S.stats.cocks} / ${S.stats.tits}`],
   ];
+  if (S.stats.weed) rows.push(["Weed / munchies", `${S.stats.weed} · ${money(S.stats.munchCents)}`]);
   if (S.stats.texts) rows.push(["Texts to your ex", S.stats.texts]);
   if (S.stats.chokes) rows.push(["Choked out", `${S.stats.chokes} time${S.stats.chokes === 1 ? "" : "s"}`]);
   if (S.stats.bosses) rows.push(["Big Bertha beaten", `${S.stats.bosses}x`]);
@@ -1493,9 +1605,10 @@ function showOver() {
 function start() {
   ensureAudio();
   S = newState(); spawnWave();
-  banner("Wave 1", "Every shot costs ten cents.", C.cyan);
   // Shortcut for testing the boss: open the page with #bertha on the end of the link.
   if (location.hash === "#bertha") { S.wave = 2; S.bugs = []; }
+  if (introSeen) banner("Wave 1", "Every shot costs ten cents.", C.cyan);
+  else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.touchFire = false; input.dragging = false;
   $("title").hidden = true; $("over").hidden = true; $("board").hidden = true;
 }
@@ -1595,6 +1708,7 @@ $("postForm").addEventListener("submit", async (e) => {
 // ---------- input ----------
 const toX = (e) => { const r = cv.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * W; };
 cv.addEventListener("pointerdown", (e) => {
+  if (S && S.mode === "intro") { S.introT = INTRO; return; }
   if (!S || S.mode !== "play") return;
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
@@ -1614,6 +1728,7 @@ cv.addEventListener("pointercancel", release);
 cv.addEventListener("lostpointercapture", release);
 const FIRE = ["Space", "ArrowUp", "KeyW"], LEFT = ["ArrowLeft", "KeyA"], RIGHT = ["ArrowRight", "KeyD"];
 addEventListener("keydown", (e) => {
+  if (S && S.mode === "intro") { if (!e.repeat) S.introT = INTRO; return; }
   if (!S || S.mode !== "play") return;
   if (LEFT.includes(e.code)) { input.left = true; e.preventDefault(); }
   if (RIGHT.includes(e.code)) { input.right = true; e.preventDefault(); }
