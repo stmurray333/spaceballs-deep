@@ -236,7 +236,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v5</span>
+  <span id="ver">v6</span>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
 
@@ -360,23 +360,29 @@ function drawStar(g, cx, cy, n, r1, r2, color) {
   g.closePath(); g.fill();
 }
 function drawPlayer(g, x, y, t, turbo, crabs) {
-  g.save(); g.translate(x, y);
+  // The ship is a dildo, as ordered by Jeremy: two pods, a shaft and a head. It buzzes on nose candy.
+  g.save(); g.translate(x + (turbo && !reduced ? Math.sin(t * 90) * 1.2 : 0), y);
   const fl = 6 + Math.sin(t * 40) * 2 + (turbo ? 9 : 0);
-  g.fillStyle = turbo ? C.pink : C.cyan;
-  g.beginPath(); g.moveTo(-4, 12); g.lineTo(0, 12 + fl); g.lineTo(4, 12); g.closePath(); g.fill();
+  g.fillStyle = turbo ? C.gold : C.cyan;
+  for (const fx of [-7, 7]) { g.beginPath(); g.moveTo(fx - 3.5, 14); g.lineTo(fx, 15 + fl); g.lineTo(fx + 3.5, 14); g.closePath(); g.fill(); }
   g.fillStyle = C.pink;
-  g.beginPath(); g.moveTo(-6, 0); g.lineTo(-16, 15); g.lineTo(-6, 10); g.closePath(); g.fill();
-  g.beginPath(); g.moveTo(6, 0); g.lineTo(16, 15); g.lineTo(6, 10); g.closePath(); g.fill();
-  g.fillStyle = C.gold;
-  g.beginPath(); g.moveTo(0, -18); g.lineTo(7, -2); g.lineTo(7, 12); g.lineTo(-7, 12); g.lineTo(-7, -2); g.closePath(); g.fill();
-  g.fillStyle = C.void; g.beginPath(); g.ellipse(0, -3, 3, 6, 0, 0, TAU); g.fill();
-  g.globalAlpha = 0.75; g.fillStyle = C.cyan; g.beginPath(); g.ellipse(-1, -5, 1, 2.5, 0, 0, TAU); g.fill();
+  g.beginPath(); g.arc(-7, 9, 7, 0, TAU); g.fill();
+  g.beginPath(); g.arc(7, 9, 7, 0, TAU); g.fill();
+  g.fillRect(-5.5, -13, 11, 23);
+  g.beginPath(); g.ellipse(0, -13.5, 7, 6, 0, 0, TAU); g.fill();
+  g.strokeStyle = C.deep; g.lineWidth = 1.2; g.globalAlpha = 0.5;
+  g.beginPath(); g.moveTo(-6.6, -10.5); g.quadraticCurveTo(0, -7, 6.6, -10.5); g.stroke();
+  g.globalAlpha = 0.45; g.fillStyle = C.ink;
+  g.beginPath(); g.ellipse(-2.8, -4, 1.2, 8, 0, 0, TAU); g.fill();
+  g.globalAlpha = 1;
+  g.fillStyle = C.void; g.beginPath(); g.ellipse(1.2, 0, 2.6, 4.2, 0, 0, TAU); g.fill();
+  g.globalAlpha = 0.75; g.fillStyle = C.cyan; g.beginPath(); g.ellipse(0.5, -1.4, 0.9, 1.8, 0, 0, TAU); g.fill();
   g.globalAlpha = 1;
   if (crabs) {
-    g.fillStyle = C.red;
-    for (const [cx, cy, ph] of [[-4, 4, 0], [5, 9, 2]]) {
+    g.fillStyle = C.red; g.strokeStyle = C.void; g.lineWidth = 0.8;
+    for (const [cx, cy, ph] of [[-2, -6, 0], [3, 8, 2]]) {
       const wx = cx + Math.sin(t * 14 + ph) * 2;
-      g.beginPath(); g.ellipse(wx, cy, 2.8, 2, 0, 0, TAU); g.fill();
+      g.beginPath(); g.ellipse(wx, cy, 2.8, 2, 0, 0, TAU); g.fill(); g.stroke();
       g.fillRect(wx - 4.5, cy - 3, 1.6, 1.6); g.fillRect(wx + 2.9, cy - 3, 1.6, 1.6);
     }
   }
@@ -791,8 +797,9 @@ function updateFlyers(dt) {
     }
     if (f.kind === "cop" && S.mode === "play" && !f.done) {
       // The searchlight is the same cone as a choker beam. Half a second in it and you blow.
+      // It only counts while you can see it: not during a blackout, and not before the cop is on screen.
       const top = f.y + 14, hw = 8 + ((P.y - top) / (H - 8 - top)) * 46;
-      if (Math.abs(P.x - f.x) < hw - 4) { f.scan += dt; if (f.scan >= 0.5) breathalyzer(f); }
+      if (S.blackout <= 0 && f.x > 20 && f.x < W - 20 && Math.abs(P.x - f.x) < hw - 4) { f.scan += dt; if (f.scan >= 0.5) breathalyzer(f); }
       else f.scan = 0;
     }
     if (f.vx > 0 ? f.x > W + 60 : f.x < -60) f.dead = true;
@@ -955,7 +962,8 @@ const STD = {
 const drunkLevel = () => Math.min(3, Math.ceil(S.drinks));
 const payMult = () => 1 + 0.5 * drunkLevel();
 // Blood alcohol in hundredths: each drink is .04, and .08 is where the cops start caring.
-const bac = () => Math.floor(S.drinks * 4 + 1e-6);
+// Rounded up, because a drink starts wearing off the moment it lands and two quick beers should still blow .08.
+const bac = () => Math.ceil(S.drinks * 4 - 1e-6);
 const bacText = () => "." + String(bac()).padStart(2, "0");
 const sick = () => S.std.clap || S.std.crabs || (S.std.herpes && S.dormant <= 0);
 function wobble() {
@@ -984,14 +992,21 @@ function breathalyzer(f) {
 function afterEscort(E) {
   if (S.mode !== "play") return;
   const P = S.player, drunk = bac() >= 8;
-  if (S.rubbers > 0 && !drunk) { S.rubbers--; pop("Wrapped it. You're clean.", P.x, P.y - 52, C.lime, 16); return; }
   const open = Object.keys(STD).filter((k) => !S.std[k]);
-  if (!open.length || Math.random() >= (drunk ? 1 : E.free ? 0.4 : 0.65)) return;
+  if (!open.length) return;
+  if (S.rubbers > 0 && !drunk) {
+    S.rubbers--;
+    pop(open.length < 3 ? "Wrapped it. Nothing new." : "Wrapped it. You're clean.", P.x, P.y - 52, C.lime, 16);
+    return;
+  }
+  if (Math.random() >= (drunk ? 1 : E.free ? 0.4 : 0.65)) return;
   const k = pick(open), [name, title, sub] = STD[k];
   S.std[k] = true;
   if (!S.stats.stds.includes(name)) S.stats.stds.push(name);
   if (k === "herpes") { S.flare = 0; S.flareCd = 5; S.dormant = 0; }
-  banner(title, (drunk && S.rubbers > 0 ? "Too drunk to find the rubber. " : "") + sub, C.lime);
+  // A banner that only just went up (the DUI that scared her off, say) keeps the stage; this rides along as a pop.
+  if (S.banner && S.banner.max - S.banner.life < 0.6) pop(title, P.x, P.y - 52, C.lime, 18);
+  else banner(title, (drunk && S.rubbers > 0 ? "Too drunk to find the rubber. " : "") + sub, C.lime);
   sfx.sick();
 }
 function clinic() {
@@ -1048,7 +1063,7 @@ function updatePlayer(dt) {
     S.cents -= 10; S.billCents += 10; S.shots++;
     S.fireCd = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1);
     sfx.shoot();
-    if (S.cents < 0 && !S.brokeQuoted) {
+    if (S.cents < 0 && !S.brokeQuoted && !S.banner) {
       S.brokeQuoted = true;
       banner("These are costing me ten cents a piece, you jackass!", "Jo Bennett. You're in debt now.", C.red);
       sfx.broke();
@@ -1584,7 +1599,8 @@ cv.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   try { cv.setPointerCapture(e.pointerId); } catch {}
   ensureAudio();
-  input.dragging = true; input.touchFire = true; input.lastFx = toX(e); input.target = S.player.x;
+  // The ship already sits at its anchor plus the drunk sway, so anchor the drag without the sway or it counts twice.
+  input.dragging = true; input.touchFire = true; input.lastFx = toX(e); input.target = clamp(S.player.x - S.player.wob, 16, W - 16);
 });
 cv.addEventListener("pointermove", (e) => {
   if (!input.dragging) return;
