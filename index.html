@@ -289,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v25</span>
+  <span id="ver">v26</span>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -1273,8 +1273,8 @@ const BOSSES = {
   bertha: { name: "Big Bertha", draw: drawBertha, hw: 58, hb: 62, intro: ["Boss: Big Bertha", "She's guarding the hot one. As ordered by Jeremy. Tentacles by Chandler."], down: ["Bertha's down", "The hot one is free. She fights for you, no charge."] },
   jones: { name: "Jon Jones", draw: drawJones, hw: 54, intro: ["Boss: Jon Jones", "You're drunk, you're high, and you just called out the GOAT."], down: ["And new", "You beat Jon Jones. Nobody is going to believe you. The belt pays $100."] },
   pimp: { name: "Big Daddy Velvet", draw: drawPimp, intro: ["Boss: Big Daddy Velvet", "The escorts work for him. He wants his cut."], down: ["Velvet's out of business", "One of his girls works for you now. No charge."] },
-  sheriff: { name: "Sheriff Buzzkill", draw: drawSheriff, intro: ["Boss: Sheriff Buzzkill", "License, registration and a breathalyzer."], down: ["The sheriff's down", "Charges dropped. Your DUI fines come back."] },
-  wife: { name: "Your Wife", draw: drawWife, intro: ["Boss: your wife", "She saw the escort charges on the statement."], down: ["She's cooled off", "You're on the couch tonight. +1 life."] },
+  sheriff: { name: "Sheriff Buzzkill", draw: drawSheriff, wide: 62, intro: ["Boss: Sheriff Buzzkill", "License, registration and a breathalyzer."], down: ["The sheriff's down", "Charges dropped. Your DUI fines come back."] },
+  wife: { name: "Your Wife", draw: drawWife, wide: 70, intro: ["Boss: your wife", "She saw the escort charges on the statement."], down: ["She's cooled off", "You're on the couch tonight. +1 life."] },
 };
 // Every boss coughs up an 8-ball when the fight starts and another when it turns ugly.
 function dropEightBall(B) { S.drops.push({ kind: "eightball", x: clamp(B.x + rand(-70, 70), 30, W - 30), y: B.y + 44, vy: 70 }); }
@@ -1351,7 +1351,7 @@ function updateBoss(dt) {
   // A boss does not hold still (as ordered by Jeremy, twice). It darts to a new spot every second or so, bobbing as it goes,
   // and every few seconds it drops down toward the ship and climbs back. Past half health it does all of it faster.
   // How far sideways it goes depends on how wide it is, so tentacles and gun barrels stay on the screen.
-  const mad = B.hp < B.maxHp / 2, reach = W / 2 - (BOSSES[B.key].hw || 40) - 20;
+  const mad = B.hp < B.maxHp / 2, reach = W / 2 - (BOSSES[B.key].wide || BOSSES[B.key].hw || 40) - 20;
   B.sway += dt * (mad ? 1.5 : 1.1);
   B.hop -= dt;
   if (B.hop <= 0) {
@@ -1584,7 +1584,8 @@ function updateRealm(dt) {
     const dueAt = (i) => 0.5 + Math.floor(i / REALM.per) * REALM.every + (i % REALM.per) * REALM.gap;
     while (R.sent < all && R.t >= dueAt(R.sent)) {
       // The eight paths come in a different order on each trip.
-      const squad = Math.floor(R.sent / REALM.per), path = (squad * (R.turn % 2 ? 3 : 1) + R.turn) % 8;
+      // Stepping by three means a squad is never followed by its own mirror image, which would fly the same arc head-on.
+      const squad = Math.floor(R.sent / REALM.per), path = (squad * 3 + R.turn) % 8;
       R.elves.push({ path, age: R.t - dueAt(R.sent), hue: R.sent, x: -99, y: -99 }); R.sent++;
     }
     for (const e of R.elves) { e.age += dt; [e.x, e.y] = elfAt(e.path, e.age / REALM.cross); if (e.age >= REALM.cross) e.dead = true; }
@@ -1790,7 +1791,10 @@ function updatePlayer(dt) {
     const guns = S.dual ? [-11, 11] : [0];
     for (const vx of lanes) for (const gx of guns) S.bullets.push({ x: P.x + gx, y: P.y - 18, vy: -540, vx: vx + rand(-1, 1) * spread });
     S.shots += lanes.length * guns.length;
-    S.fireCd = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1) * (S.tweak > 0 ? 0.5 : 1);
+    const wait = (S.turbo > 0 ? 0.07 : S.crash > 0 ? 0.45 : 0.2) * (S.std.clap ? 1.5 : 1) * (S.tweak > 0 ? 0.5 : 1);
+    // In the realm the guns fire about ten times a second, whatever shape you are in. Eighty targets go by in sixteen
+    // seconds and each shot takes one of them, so at the usual five a second a clean sweep could not be done at all.
+    S.fireCd = S.realm ? Math.min(0.08, wait) : wait;
     sfx.shoot();
     // Nose candy and the 8-ball are too wired to overheat: no heat builds while either is running.
     if (S.turbo <= 0 && S.tweak <= 0 && !S.realm) {
