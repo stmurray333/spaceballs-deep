@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c0716">
 <title>Spaceballs Deep</title>
+<!-- Added to a phone's home screen it opens full screen with its own icon, like an app. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spaceballs">
 <meta name="description" content="Galactic escorts, nose candy and booze. As ordered by Jeremy.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -211,7 +219,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
   font-size: calc(var(--u) * 14); color: var(--dim);
 }
 /* Two corner buttons: Sound, and Fire (hold your fire to let the guns cool), which takes the version label's corner while a game is on. */
-#mute, #fire {
+#mute, #fire, #update {
   position: absolute; bottom: calc(var(--u) * 8); z-index: 2;
   font-family: var(--font-hud); font-size: calc(var(--u) * 15);
   padding: calc(var(--u) * 3) calc(var(--u) * 8); border-radius: calc(var(--u) * 4);
@@ -220,6 +228,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 }
 #mute { right: calc(var(--u) * 8); }
 #fire { left: calc(var(--u) * 8); color: var(--ink); }
+/* A newer version is out: this takes the version label's corner on the title and end screens. */
+#update { left: calc(var(--u) * 8); color: var(--lime); border-color: var(--lime); }
 #fire[aria-pressed="false"] { color: var(--red); border-color: var(--red); }
 /* With tilt steering it is a hold-to-fire button: bigger, and it lights up while the guns are running. */
 #fire.hold {
@@ -307,7 +317,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v35</span>
+  <span id="ver">v36</span>
+  <button id="update" type="button" hidden>Update</button>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
 </div>
@@ -560,6 +571,16 @@ function drawDrop(g, kind, x, y, t) {
     g.fillStyle = C.pink; g.fillRect(-10, -6.5, 20, 13);
     g.shadowBlur = 0; g.strokeStyle = C.gold; g.lineWidth = 1; g.strokeRect(-8.5, -5, 17, 10);
     drawHeart(g, 0, 0.5, 3, C.gold);
+  } else if (kind === "prenup") {
+    // A prenup: a signed sheet with a tick and a gold seal. White with a gold glow, where her papers are red.
+    g.rotate(Math.sin(t * 3) * 0.1);
+    g.shadowColor = C.gold; g.shadowBlur = 12;
+    g.fillStyle = C.ink; g.fillRect(-7.5, -9.5, 15, 19);
+    g.shadowBlur = 0;
+    g.fillStyle = C.dim; g.fillRect(-5, -6.5, 10, 1.3); g.fillRect(-5, -3.5, 10, 1.3); g.fillRect(-5, -0.5, 6, 1.3);
+    g.strokeStyle = C.lime; g.lineWidth = 2.2; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(-4.5, 4.5); g.lineTo(-1.8, 7.2); g.lineTo(3.5, 1.8); g.stroke();
+    g.fillStyle = C.gold; g.beginPath(); g.arc(5, 7, 2.8, 0, TAU); g.fill();
   } else if (kind === "whiskey") {
     // A bottle of the brown stuff: square shoulders, a short neck, a cap and a label.
     g.shadowColor = C.orange; g.shadowBlur = 10;
@@ -1211,7 +1232,7 @@ function newState() {
     mode: "play", t: 0, wt: 0, sway: 0, wave: 1, cents: 1000, billCents: 0, shots: 0, lives: 3,
     player: { x: W / 2, y: H - 74, inv: 1.5, wob: 0 }, fireCd: 0,
     bullets: [], ebullets: [], bugs: [], drops: [], parts: [], pops: [],
-    turbo: 0, crash: 0, escort: null, hard: 0, girls: [], leaveCd: 0, beamer: null, heat: 0, hot: false, dual: false, rescue: null, mug: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
+    turbo: 0, crash: 0, escort: null, hard: 0, girls: [], leaveCd: 0, prenup: 0, beamer: null, heat: 0, hot: false, dual: false, rescue: null, mug: null, bump: 0, bumpKind: "key", bumpWave: 0, hamWave: 0, realm: null, dmtWave: 0, wipe: 0, waffleWave: 0,
     drinks: 0, peak: 0, hangover: 0, blackout: 0, rubbers: 0,
     high: 0, slow: 1, munch: 0, introT: 0, introBoom: false, tweak: 0, jam: 0, refunded: 0,
     std: { clap: false, crabs: false, herpes: false }, flare: 0, flareCd: 0, dormant: 0,
@@ -1221,7 +1242,7 @@ function newState() {
       kills: 0, bags: 0, escorts: 0, escortCents: 0, chokes: 0, cody: 0, cocks: 0, tits: 0, bosses: 0,
       beers: 0, whiskeys: 0, pills: 0, duis: 0, texts: 0, stds: [], weed: 0, munchCents: 0, eightballs: 0,
       peakBac: 0, dimes: 0, eighths: 0, stdHits: { clap: 0, crabs: 0, herpes: 0 }, rubbersUsed: 0, clinics: 0,
-      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0, robbed: 0, robbedCents: 0, wonBack: 0,
+      tickets: 0, slaps: 0, papers: 0, papersCents: 0, hits: 0, hitsBy: {}, lastHit: "", earned: 0, refundCents: 0, overheats: 0, captured: 0, rescued: 0, bumps: 0, trips: 0, elves: 0, waffles: 0, robbed: 0, robbedCents: 0, wonBack: 0, prenups: 0, countersuits: 0,
     },
   };
 }
@@ -1392,6 +1413,17 @@ const BOSSES = {
 };
 // Every boss coughs up an 8-ball when the fight starts and another when it turns ugly.
 function dropEightBall(B) { S.drops.push({ kind: "eightball", x: clamp(B.x + rand(-70, 70), 30, W - 30), y: B.y + 44, vy: 70 }); }
+// Your wife's fight comes with one more thing to grab at the same two moments, as asked for by Jeremy: a prenup.
+// For PRENUP seconds her divorce papers bounce off and go back at her, and the silent treatment cannot jam the guns.
+const PRENUP = 20, COUNTERSUIT = 14;
+function dropPrenup(B) {
+  if (B.key !== "wife") return;
+  // It lands well clear of the 8-ball that came out with it, so one is never hidden behind the other.
+  const ball = S.drops[S.drops.length - 1];
+  let x = clamp(B.x + rand(-70, 70), 30, W - 30);
+  if (ball && Math.abs(x - ball.x) < 48) x = clamp(ball.x + (ball.x > W / 2 ? -60 : 60), 30, W - 30);
+  S.drops.push({ kind: "prenup", x, y: B.y + 44, vy: 62 });
+}
 function spawnBoss() {
   const key = BOSS_ORDER[S.bossCount++ % BOSS_ORDER.length], hp = 110 + (S.bossCount - 1) * 45;
   S.boss = { key, x: W / 2, y: -70, hp, maxHp: hp, ft: 0, sway: 0, tx: W / 2, hop: 0.6, dip: 0, dipCd: rand(4, 6), state: "enter", atk: 0, atkCd: 1.2, flash: 0, dieT: 0, balls: 0 };
@@ -1446,8 +1478,9 @@ function bossAttack(B) {
     if (kind === 0) fan({ kind: "pan" }, mad ? 7 : 5, 0.2, sp - 10);
     else if (kind === 1) seekers({ kind: "papers" }, mad ? [-36, 36] : [0]);
     else {
-      S.jam = mad ? 2 : 1.5;
-      pop("SILENT TREATMENT. Guns jammed.", P.x, P.y - 34, C.cyan, 18); sfx.warn();
+      if (S.prenup > 0) pop("SILENT TREATMENT. Overruled.", P.x, P.y - 34, C.gold, 18);
+      else { S.jam = mad ? 2 : 1.5; pop("SILENT TREATMENT. Guns jammed.", P.x, P.y - 34, C.cyan, 18); }
+      sfx.warn();
       fan({ kind: "pan" }, 3, 0.35, sp - 30);
     }
   }
@@ -1458,7 +1491,7 @@ function updateBoss(dt) {
   B.flash = Math.max(0, B.flash - dt);
   if (B.state === "enter") {
     B.y = Math.min(BOSS_Y, B.y + 120 * dt);
-    if (B.y >= BOSS_Y) { B.state = "fight"; dropEightBall(B); }
+    if (B.y >= BOSS_Y) { B.state = "fight"; dropEightBall(B); dropPrenup(B); }
     return;
   }
   if (B.state === "dying") {
@@ -1497,7 +1530,7 @@ function hitBoss(B, dmg = 1) {
   B.hp -= dmg; B.flash = 0.06;
   if (B.hp > 0) {
     if (!B.balls && B.hp < B.maxHp / 2) {
-      B.balls = 1; dropEightBall(B);
+      B.balls = 1; dropEightBall(B); dropPrenup(B);
       if (B.key === "jones") banner("Roid rage", "He swears it was a tainted supplement. He hits faster and throws more.", C.red);
     }
     if (Math.floor(B.hp) % 3 === 0) sfx.tink();
@@ -1509,6 +1542,7 @@ function hitBoss(B, dmg = 1) {
 }
 function finishBoss(B) {
   burst(B.x, B.y, C.pink, 40); burst(B.x, B.y, C.gold, 30);
+  S.prenup = 0; S.drops = S.drops.filter((d) => d.kind !== "prenup");
   S.cents += 5000; S.stats.earned += 5000; S.stats.bosses++;
   pop("+$50.00", B.x, B.y, C.gold, 26);
   S.boss = null;
@@ -1537,6 +1571,12 @@ function finishBoss(B) {
 function shotHit(e) {
   const P = S.player, k = e.kind;
   if (k === "papers") {
+    if (S.prenup > 0) {
+      // Countersued: nothing is taken, and the papers go straight back at her.
+      S.stats.countersuits++; pop("COUNTERSUED", P.x, P.y - 34, C.gold, 18); sfx.tink();
+      S.bullets.push({ x: e.x, y: P.y - 16, vy: -430, paper: true });
+      return;
+    }
     const half = clamp(Math.floor(S.cents / 2), 0, 25000);
     S.cents -= half; S.stats.papers++; S.stats.papersCents += half;
     P.inv = Math.max(P.inv, 1.2); S.shake = 0.3; sfx.broke();
@@ -1626,6 +1666,10 @@ function collect(kind) {
     if (!S.seen.ball) { S.seen.ball = true; banner("8-ball", "Triple shots at double speed. You haven't slept since Tuesday.", C.cyan); }
   } else if (kind === "waffle") {
     waffleHouse();
+  } else if (kind === "prenup") {
+    S.prenup = PRENUP; S.jam = 0; S.stats.prenups++;
+    pop("*PRENUP*", P.x, P.y - 30, C.gold, 20); sfx.power();
+    if (!S.seen.prenup) { S.seen.prenup = true; banner("Prenup", "Her papers bounce off and go straight back at her. And she has to talk to you.", C.gold); }
   } else {
     S.lives++; S.stats.cody++;
     banner("Navy SEAL Cody", "has entered the chat. +1 life", C.gold); sfx.power();
@@ -1942,6 +1986,7 @@ function smoke(big) {
 function updateVices(dt) {
   const P = S.player;
   if (S.jam > 0) S.jam = Math.max(0, S.jam - dt);
+  if (S.prenup > 0) S.prenup = Math.max(0, S.prenup - dt);
   if (S.tweak > 0) {
     S.tweak -= dt;
     if (S.tweak <= 0) {
@@ -2162,7 +2207,10 @@ function update(dt) {
   updateBoss(edt);
   updateFlyers(edt);
 
-  for (const s of S.bullets) { s.x += (s.vx || 0) * dt; s.y += s.vy * dt; }
+  for (const s of S.bullets) {
+    if (s.paper && S.boss) s.vx = clamp((S.boss.x - s.x) * 5, -260, 260);
+    s.x += (s.vx || 0) * dt; s.y += s.vy * dt;
+  }
   for (const e of S.ebullets) {
     if (e.home) e.vx = clamp(e.vx + Math.sign(P.x - e.x) * e.home * 2 * edt, -e.home, e.home);
     e.x += e.vx * edt; e.y += e.vy * edt;
@@ -2189,7 +2237,7 @@ function update(dt) {
     for (const b of S.bugs) {
       if (s.dead || b.dead || b.delay > 0) continue;
       const r = b.type === "choker" ? 15 : 12;
-      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; if (!s.heart) S.stats.hits++; hitBug(b, s.heart ? 1 : punch()); }
+      if (Math.abs(s.x - b.x) < r && Math.abs(s.y - b.y) < r) { s.dead = true; if (!s.heart && !s.paper) S.stats.hits++; hitBug(b, s.heart || s.paper ? 1 : punch()); }
     }
     for (const f of S.flyers) {
       if (s.dead || f.dead) continue;
@@ -2197,10 +2245,10 @@ function update(dt) {
         : f.kind === "keg" ? Math.abs(s.x - f.x) < 16 && Math.abs(s.y - f.y) < 17
         : f.kind === "cop" ? Math.abs(s.x - f.x) < 27 && s.y > f.y - 20 && s.y < f.y + 12
         : Math.abs(s.x - f.x) < 12 && Math.abs(s.y - f.y) < 11;
-      if (hit) { s.dead = true; if (!s.heart) S.stats.hits++; hitFlyer(f, s.heart ? 1 : punch()); }
+      if (hit) { s.dead = true; if (!s.heart && !s.paper) S.stats.hits++; hitFlyer(f, s.heart || s.paper ? 1 : punch()); }
     }
     const B = S.boss;
-    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < (BOSSES[B.key].hw || 40) && s.y > B.y - 58 && s.y < B.y + (BOSSES[B.key].hb || 44)) { s.dead = true; if (!s.heart) S.stats.hits++; hitBoss(B, s.heart ? 1 : punch()); }
+    if (B && B.state === "fight" && !s.dead && Math.abs(s.x - B.x) < (BOSSES[B.key].hw || 40) && s.y > B.y - 58 && s.y < B.y + (BOSSES[B.key].hb || 44)) { s.dead = true; if (!s.heart && !s.paper) S.stats.hits++; hitBoss(B, s.paper ? COUNTERSUIT : s.heart ? 1 : punch()); }
   }
 
   if (S.mode === "play") {
@@ -2354,6 +2402,7 @@ function drawHUD(g) {
   if (S.high > 0) boosts.push([`HIGH · they're all in slow motion · ${S.high.toFixed(1)}s`, `HIGH ${S.high.toFixed(1)}s`, C.lime]);
   if (S.tweak > 0) boosts.push([`8-BALL · triple shots · ${S.tweak.toFixed(1)}s`, `8-BALL ${S.tweak.toFixed(1)}s`, C.cyan]);
   if (S.hard > 0) boosts.push([`BONER PILLS · three on the house · ${S.hard.toFixed(1)}s`, `PILLS ${S.hard.toFixed(1)}s`, C.blue]);
+  if (S.prenup > 0) boosts.push([`PRENUP · her papers go back at her · ${S.prenup.toFixed(1)}s`, `PRENUP ${S.prenup.toFixed(1)}s`, C.gold]);
   if (boosts.length) {
     g.fillStyle = boosts.length === 1 ? boosts[0][2] : C.ink;
     const line = boosts.length === 1 ? boosts[0][0] : boosts.map((b) => b[1]).join(" · "), wide = g.measureText(line).width;
@@ -2966,6 +3015,13 @@ function render() {
   for (const d of S.drops) drawDrop(ctx, d.kind, d.x, d.y, S.t);
   for (const s of S.bullets) {
     if (s.heart) drawHeart(ctx, s.x, s.y, 4.5, s.gold ? C.gold : C.pink);
+    else if (s.paper) {
+      // Her papers on their way back: a gold sheet, spinning.
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(reduced ? 0.3 : S.t * 9);
+      ctx.shadowColor = C.gold; ctx.shadowBlur = 10; ctx.fillStyle = C.gold; ctx.fillRect(-6, -7.5, 12, 15);
+      ctx.shadowBlur = 0; ctx.fillStyle = C.void; ctx.fillRect(-4, -4.5, 8, 1.3); ctx.fillRect(-4, -1.5, 8, 1.3);
+      ctx.restore();
+    }
     else { ctx.fillStyle = S.turbo > 0 ? C.pink : S.std.clap ? C.lime : C.cyan; ctx.fillRect(s.x - 1.5, s.y - 7, 3, 12); }
   }
   if (S.escort) drawEscort(ctx, S.escort.x, S.escort.y, S.t, S.escort.free);
@@ -3123,6 +3179,7 @@ function buildSheet(c) {
       ["Tickets", st.tickets],
       ["Pimp slaps", st.slaps],
       ["Divorce papers served", st.papers],
+      ["Countersuits", st.countersuits],
     ]],
     ["The fight", [
       ["Time alive", `${Math.floor(T / 60)}:${String(T % 60).padStart(2, "0")}`],
@@ -3191,7 +3248,7 @@ function showOver() {
   $("best").textContent = isBest ? "New personal best" : `Your best: ${money(best)}`;
   lastRun = { s: clamp(c, -100000, 10000000), w: S.wave };
   posted = null; postBtn.disabled = false; postStatus.textContent = "";
-  fireBtn.hidden = true; $("ver").hidden = false;
+  fireBtn.hidden = true; showVersion(true);
   $("over").hidden = false;
 }
 function start() {
@@ -3207,7 +3264,7 @@ function start() {
   else if (reduced) { introSeen = true; banner("Wave 1", `U.S.S. Mike Honcho, reporting for duty. ${restHint()}`, C.cyan); }
   else { introSeen = true; S.mode = "intro"; sfx.power(); }
   input.target = W / 2; input.targetY = Y_MAX; input.touchFire = false; input.dragging = false;
-  fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; $("ver").hidden = true;
+  fireOn = !gyro.on; input.holdFire = false; syncFire(); fireBtn.hidden = S.mode === "intro"; showVersion(false);
   gyro.rest = null;
   // An iPhone asks permission for tilt with a system prompt; the game waits behind it rather than starting without a pilot.
   if (gyro.wanted && !gyro.on && TILT_OK) { asking = true; setGyro(true).finally(() => { asking = false; last = performance.now(); }); }
@@ -3513,6 +3570,28 @@ function frame(now) {
 const relayout = () => { fit(); drawIcons(); };
 addEventListener("resize", relayout);
 if (window.visualViewport) visualViewport.addEventListener("resize", relayout);
+// ---------- a newer version ----------
+// A copy on a phone's home screen has no refresh button, so the title and end screens look for a newer version and
+// offer it. It only ever reloads when the button is pressed.
+const HERE = Number((/v(\d+)/.exec($("ver").textContent) || [0, 0])[1]);
+let newer = 0, lookedAt = -1e9;
+function showVersion(on) {
+  $("ver").hidden = !on || newer > HERE; $("update").hidden = !on || newer <= HERE;
+  if (on) lookForNewer();
+}
+async function lookForNewer() {
+  if (!HERE || newer > HERE || performance.now() - lookedAt < 60000) return;
+  lookedAt = performance.now();
+  try {
+    const r = await fetch(location.pathname + "?t=" + Date.now(), { cache: "no-store" });
+    const m = r.ok && /id="ver">v(\d+)</.exec(await r.text());
+    if (!m || Number(m[1]) <= HERE) return;
+    newer = Number(m[1]); $("update").textContent = `Update to v${newer}`;
+    if (!S || S.mode === "over") showVersion(true);
+  } catch {}
+}
+$("update").addEventListener("click", () => { location.replace(location.pathname + "?v=" + newer + location.hash); });
+showVersion(true);
 relayout();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawIcons);
 requestAnimationFrame(frame);
