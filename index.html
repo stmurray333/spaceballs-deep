@@ -317,7 +317,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     <button id="boardBack" class="ghost" type="button">Back</button>
   </section>
 
-  <span id="ver">v36</span>
+  <span id="ver">v37</span>
   <button id="update" type="button" hidden>Update</button>
   <button id="fire" type="button" aria-pressed="true" hidden>Fire on</button>
   <button id="mute" type="button" aria-pressed="false">Sound on</button>
@@ -2208,7 +2208,8 @@ function update(dt) {
   updateFlyers(edt);
 
   for (const s of S.bullets) {
-    if (s.paper && S.boss) s.vx = clamp((S.boss.x - s.x) * 5, -260, 260);
+    // Her papers on the way back are aimed afresh every frame at where she is now, so they land wherever she darts to.
+    if (s.paper && S.boss) s.vx = clamp((S.boss.x - s.x) / Math.max(0.05, (s.y - S.boss.y) / -s.vy), -900, 900);
     s.x += (s.vx || 0) * dt; s.y += s.vy * dt;
   }
   for (const e of S.ebullets) {
